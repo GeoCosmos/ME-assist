@@ -38,3 +38,9 @@ def test_includes_verify_flag_convention_and_safety_guardrail():
 
 def test_instructs_preferring_reference_data():
     assert "reference" in SYSTEM_PROMPT.lower()
+
+
+def test_instructs_cutting_padding_not_substance():
+    lowered = SYSTEM_PROMPT.lower()
+    assert "concise" in lowered or "padding" in lowered
+    assert "every equation" in lowered or "every derivation step" in lowered
