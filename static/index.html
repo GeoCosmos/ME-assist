@@ -7,6 +7,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
 <style>
   :root {
     --bg: #0A0E12;
@@ -374,16 +377,37 @@
     const lines = withInline.split('\n');
     const htmlParts = [];
     let listBuffer = [];
+    let listTag = null;
+    let inCodeFence = false;
+    let codeBuffer = [];
 
     const flushList = () => {
       if (listBuffer.length) {
-        htmlParts.push(`<ul>${listBuffer.map((li) => `<li>${li}</li>`).join('')}</ul>`);
+        htmlParts.push(`<${listTag}>${listBuffer.map((li) => `<li>${li}</li>`).join('')}</${listTag}>`);
         listBuffer = [];
+        listTag = null;
       }
     };
 
     for (const rawLine of lines) {
       const trimmed = rawLine.trim();
+
+      if (trimmed === '```') {
+        if (inCodeFence) {
+          htmlParts.push(`<pre><code>${codeBuffer.join('\n')}</code></pre>`);
+          codeBuffer = [];
+          inCodeFence = false;
+        } else {
+          flushList();
+          inCodeFence = true;
+        }
+        continue;
+      }
+      if (inCodeFence) {
+        codeBuffer.push(rawLine);
+        continue;
+      }
+
       if (!trimmed) {
         flushList();
         continue;
@@ -393,15 +417,36 @@
         htmlParts.push(
           `<div class="flag"><span aria-hidden="true">&#9888;</span>${trimmed.slice(7).trim()}</div>`
         );
-      } else if (trimmed.startsWith('- ')) {
+      } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+        if (listTag && listTag !== 'ul') flushList();
+        listTag = 'ul';
         listBuffer.push(trimmed.slice(2));
+      } else if (/^\d+\.\s/.test(trimmed)) {
+        if (listTag && listTag !== 'ol') flushList();
+        listTag = 'ol';
+        listBuffer.push(trimmed.replace(/^\d+\.\s/, ''));
       } else {
         flushList();
         htmlParts.push(`<p>${trimmed}</p>`);
       }
     }
     flushList();
+    if (inCodeFence && codeBuffer.length) {
+      htmlParts.push(`<pre><code>${codeBuffer.join('\n')}</code></pre>`);
+    }
     return htmlParts.join('');
+  }
+
+  function renderMath(container) {
+    if (window.renderMathInElement) {
+      window.renderMathInElement(container, {
+        delimiters: [
+          { left: '$$', right: '$$', display: true },
+          { left: '$', right: '$', display: false },
+        ],
+        throwOnError: false,
+      });
+    }
   }
 
   function appendEntry(role, index, label, bodyHTML) {
@@ -535,6 +580,7 @@
     }
 
     responseBody.innerHTML = formatBody(result.text);
+    renderMath(responseBody);
     history.push({ role: 'model', content: result.text });
     const elapsedSeconds = ((performance.now() - startedAt) / 1000).toFixed(1);
     latencyLabel.textContent = `LAT: ${elapsedSeconds}s`;
