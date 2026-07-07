@@ -46,3 +46,12 @@ def test_anthropic_provider_is_registered():
 
     assert llm._PROVIDERS["anthropic"] is AnthropicProvider
     assert llm._MODELS["anthropic"] == ANTHROPIC_MODEL
+
+
+def test_openai_provider_is_registered():
+    import llm
+    from config import OPENAI_MODEL
+    from llm.openai import OpenAIProvider
+
+    assert llm._PROVIDERS["openai"] is OpenAIProvider
+    assert llm._MODELS["openai"] == OPENAI_MODEL

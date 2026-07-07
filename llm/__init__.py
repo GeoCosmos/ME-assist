@@ -1,18 +1,21 @@
 from collections.abc import Iterator
 
-from config import ANTHROPIC_MODEL, GEMINI_MODEL, LLM_PROVIDER
+from config import ANTHROPIC_MODEL, GEMINI_MODEL, LLM_PROVIDER, OPENAI_MODEL
 from llm.anthropic import AnthropicProvider
 from llm.base import LLMError, build_full_system_instruction
 from llm.gemini import GeminiProvider
+from llm.openai import OpenAIProvider
 
 _PROVIDERS = {
     "gemini": GeminiProvider,
     "anthropic": AnthropicProvider,
+    "openai": OpenAIProvider,
 }
 
 _MODELS = {
     "gemini": GEMINI_MODEL,
     "anthropic": ANTHROPIC_MODEL,
+    "openai": OPENAI_MODEL,
 }
 
 
