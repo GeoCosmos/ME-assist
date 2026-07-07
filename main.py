@@ -6,8 +6,8 @@ from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from config import GEMINI_MODEL
-from llm import LLMError, get_response_stream
+from config import LLM_PROVIDER
+from llm import LLMError, current_model, get_response_stream
 
 app = FastAPI()
 
@@ -42,7 +42,7 @@ def chat(request: ChatRequest):
 
 @app.get("/model-info")
 def model_info():
-    return {"model": GEMINI_MODEL}
+    return {"provider": LLM_PROVIDER, "model": current_model()}
 
 
 app.mount("/", StaticFiles(directory="static", html=True), name="static")

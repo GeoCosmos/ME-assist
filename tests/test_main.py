@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from config import GEMINI_MODEL
+from config import GEMINI_MODEL, LLM_PROVIDER
 from main import app
 from llm import LLMError
 
@@ -54,11 +54,11 @@ def test_chat_streams_error_event_on_llm_failure(mock_get_response_stream):
     assert events == [{"error": "Gemini API call failed: network error"}]
 
 
-def test_model_info_returns_configured_model():
+def test_model_info_returns_configured_provider_and_model():
     response = client.get("/model-info")
 
     assert response.status_code == 200
-    assert response.json() == {"model": GEMINI_MODEL}
+    assert response.json() == {"provider": LLM_PROVIDER, "model": GEMINI_MODEL}
 
 
 def test_root_serves_frontend():
