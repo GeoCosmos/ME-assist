@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ME-ASSIST</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0A0E12;
+    --panel: #10161C;
+    --grid-line: #1E2830;
+    --grid-line-soft: #182028;
+    --text: #C8D6DC;
+    --text-dim: #5C707A;
+    --text-dimmer: #3D4C56;
+    --accent: #2FD8C4;
+    --warn: #E8A33D;
+    --warn-dim: rgba(232, 163, 61, 0.12);
+    --danger: #FF5C5C;
+    --font-display: 'Space Grotesk', sans-serif;
+    --font-body: 'IBM Plex Sans', sans-serif;
+    --font-mono: 'IBM Plex Mono', monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 15.5px;
+    line-height: 1.6;
+  }
+
+  .console { display: flex; height: 100vh; }
+
+  .ops-panel {
+    width: 216px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border-right: 1px solid var(--grid-line);
+    display: flex;
+    flex-direction: column;
+  }
+  .ops-panel__brand { padding: 18px 16px 16px; border-bottom: 1px solid var(--grid-line); }
+  .ops-panel__plate {
+    background: #F4F2EC;
+    border-radius: 3px;
+    padding: 6px 10px 4px;
+    display: inline-flex;
+    line-height: 0;
+  }
+  .ops-panel__plate img { height: 18px; width: auto; display: block; }
+  .ops-panel__section-label {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    color: var(--text-dimmer);
+    padding: 16px 16px 8px;
+  }
+  .launchers { display: flex; flex-direction: column; gap: 2px; padding: 0 8px; }
+  .launcher {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    letter-spacing: 0.04em;
+    text-align: left;
+    padding: 9px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    width: 100%;
+  }
+  .launcher::before {
+    content: '';
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--text-dimmer);
+    flex-shrink: 0;
+  }
+  .launcher:hover, .launcher:focus-visible {
+    background: var(--grid-line-soft);
+    color: var(--text);
+    border-color: var(--grid-line);
+  }
+  .launcher:hover::before, .launcher:focus-visible::before { background: var(--accent); }
+  .launcher:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  .ops-panel__footer {
+    margin-top: auto;
+    padding: 14px 16px 18px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: var(--text-dimmer);
+  }
+
+  .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 11px 20px;
+    border-bottom: 1px solid var(--grid-line);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+  }
+  .status-bar__toggle {
+    display: none;
+    background: none;
+    border: 1px solid var(--grid-line);
+    color: var(--text-dim);
+    border-radius: 3px;
+    width: 28px;
+    height: 28px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .status-bar__name {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 0.01em;
+    color: var(--text);
+    margin-right: auto;
+  }
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-dimmer);
+    display: inline-block;
+    margin-right: 6px;
+  }
+  .status-live .status-dot {
+    background: var(--accent);
+    box-shadow: 0 0 6px var(--accent);
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+  .status-live { color: var(--accent); }
+
+  .log { flex: 1; overflow-y: auto; padding: 22px 20px 8px; }
+  .log__empty { color: var(--text-dim); font-size: 14.5px; max-width: 46ch; padding-top: 40px; }
+
+  .entry { margin-bottom: 26px; }
+  .entry__meta {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding-bottom: 6px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid var(--grid-line);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: var(--text-dim);
+  }
+  .entry--query .entry__label { color: var(--accent); }
+  .entry--error .entry__label { color: var(--danger); }
+  .entry--error { border-left: 2px solid var(--danger); padding-left: 14px; }
+
+  .entry__body p { margin: 0 0 12px; }
+  .entry__body p:last-child { margin-bottom: 0; }
+  .entry__body code {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    background: var(--panel);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+  .entry__body ul { margin: 0 0 12px; padding-left: 20px; }
+  .entry__body .flag {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    background: var(--warn-dim);
+    border-left: 2px solid var(--warn);
+    color: var(--warn);
+    padding: 8px 12px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    margin: 12px 0;
+    border-radius: 0 3px 3px 0;
+  }
+
+  .cursor {
+    display: inline-block;
+    width: 7px;
+    height: 15px;
+    background: var(--accent);
+    margin-left: 2px;
+    vertical-align: text-bottom;
+    animation: blink 1s step-start infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .status-live .status-dot, .cursor { animation: none; }
+  }
+
+  .input-bar {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+    padding: 14px 20px;
+    border-top: 1px solid var(--grid-line);
+    background: var(--bg);
+  }
+  .input-bar__field {
+    flex: 1;
+    resize: none;
+    max-height: 200px;
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--grid-line);
+    border-radius: 4px;
+    padding: 10px 12px;
+    font-family: var(--font-body);
+    font-size: 14.5px;
+    line-height: 1.4;
+  }
+  .input-bar__field:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .input-bar__send {
+    background: var(--accent);
+    color: #04201C;
+    border: none;
+    border-radius: 4px;
+    width: 38px;
+    height: 38px;
+    font-size: 15px;
+    cursor: pointer;
+    flex-shrink: 0;
+    font-weight: 700;
+  }
+  .input-bar__send:hover { filter: brightness(1.1); }
+  .input-bar__send:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+
+  .ops-panel__scrim { display: none; }
+  @media (max-width: 640px) {
+    .status-bar__toggle { display: inline-block; }
+    .ops-panel {
+      position: fixed;
+      inset: 0 25% 0 0;
+      z-index: 20;
+      transform: translateX(-100%);
+      transition: transform 0.2s ease;
+    }
+    .ops-panel.is-open { transform: translateX(0); }
+    .ops-panel__scrim {
+      display: block;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 10;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+    .ops-panel__scrim.is-open { opacity: 1; pointer-events: auto; }
+    .status-bar { padding: 10px 14px; gap: 12px; font-size: 10.5px; }
+    .log { padding: 18px 14px 8px; }
+    .input-bar { padding: 12px 14px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ops-panel { transition: none; }
+    .ops-panel__scrim { transition: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="console">
+    <div class="ops-panel__scrim" id="scrim"></div>
+    <aside class="ops-panel" id="ops-panel">
+      <div class="ops-panel__brand">
+        <span class="ops-panel__plate"><img src="/geocosmos_icon.png" alt="GeoCosmos"></span>
+      </div>
+      <div class="ops-panel__section-label">QUICK LAUNCH</div>
+      <div class="launchers" id="launchers">
+        <button type="button" class="launcher" data-question="How do I calculate the reaction forces on this bracket?">STATICS / DYNAMICS</button>
+        <button type="button" class="launcher" data-question="What material would you recommend for this part, and why?">MATERIALS</button>
+        <button type="button" class="launcher" data-question="How will this component behave under thermal cycling in orbit?">THERMAL</button>
+        <button type="button" class="launcher" data-question="What layup would you use for this panel, and what failure theory applies?">COMPOSITES</button>
+        <button type="button" class="launcher" data-question="What's the expected response of this bracket to launch vibration?">VIBRATIONS</button>
+        <button type="button" class="launcher" data-question="What GD&amp;T callouts should I use on this drawing?">GD&amp;T</button>
+        <button type="button" class="launcher" data-question="What fastener size and torque should I use here?">FASTENERS</button>
+        <button type="button" class="launcher" data-question="Is this part design-for-manufacturability friendly?">MANUFACTURING</button>
+      </div>
+      <div class="ops-panel__footer">ME-ASSIST&nbsp;/&nbsp;GEOCOSMOS</div>
+    </aside>
+
+    <div class="main">
+      <header class="status-bar">
+        <button type="button" class="status-bar__toggle" id="panel-toggle" aria-label="Toggle quick launch panel">&#9776;</button>
+        <span class="status-bar__name">ME-ASSIST</span>
+        <span id="model-label">MODEL: &mdash;</span>
+        <span id="status-label">IDLE</span>
+        <span id="latency-label"></span>
+      </header>
+
+      <main class="log" id="log" aria-live="polite">
+        <div class="log__empty" id="empty-state">
+          <p>No entries yet. Ask a mechanical engineering question below &mdash; statics, materials, thermal, composites, tolerancing, whatever you've got. Or pick a quick launch topic from the panel.</p>
+        </div>
+      </main>
+
+      <form class="input-bar" id="input-form">
+        <textarea id="input" class="input-bar__field" placeholder="Ask a mechanical engineering question&hellip;" rows="1" required></textarea>
+        <button type="submit" class="input-bar__send" aria-label="Send">&#10148;</button>
+      </form>
+    </div>
+  </div>
+
+<script>
+  const log = document.getElementById('log');
+  const emptyState = document.getElementById('empty-state');
+  const form = document.getElementById('input-form');
+  const input = document.getElementById('input');
+  const statusLabel = document.getElementById('status-label');
+  const latencyLabel = document.getElementById('latency-label');
+  const modelLabel = document.getElementById('model-label');
+  const opsPanel = document.getElementById('ops-panel');
+  const scrim = document.getElementById('scrim');
+  const panelToggle = document.getElementById('panel-toggle');
+  const launchers = document.getElementById('launchers');
+
+  let history = [];
+  let entryIndex = 0;
+
+  fetch('/model-info')
+    .then((res) => res.json())
+    .then((data) => { modelLabel.textContent = `MODEL: ${data.model}`; })
+    .catch(() => { modelLabel.textContent = 'MODEL: unknown'; });
+
+  function pad(n) {
+    return String(n).padStart(3, '0');
+  }
+
+  function formatBody(text) {
+    const escaped = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+    const withInline = escaped
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/`([^`]+)`/g, '<code>$1</code>');
+
+    const lines = withInline.split('\n');
+    const htmlParts = [];
+    let listBuffer = [];
+
+    const flushList = () => {
+      if (listBuffer.length) {
+        htmlParts.push(`<ul>${listBuffer.map((li) => `<li>${li}</li>`).join('')}</ul>`);
+        listBuffer = [];
+      }
+    };
+
+    for (const rawLine of lines) {
+      const trimmed = rawLine.trim();
+      if (!trimmed) {
+        flushList();
+        continue;
+      }
+      if (trimmed.startsWith('VERIFY:')) {
+        flushList();
+        htmlParts.push(
+          `<div class="flag"><span aria-hidden="true">&#9888;</span>${trimmed.slice(7).trim()}</div>`
+        );
+      } else if (trimmed.startsWith('- ')) {
+        listBuffer.push(trimmed.slice(2));
+      } else {
+        flushList();
+        htmlParts.push(`<p>${trimmed}</p>`);
+      }
+    }
+    flushList();
+    return htmlParts.join('');
+  }
+
+  function appendEntry(role, index, label, bodyHTML) {
+    if (emptyState && emptyState.parentNode) emptyState.remove();
+    const article = document.createElement('article');
+    article.className = `entry entry--${role}`;
+    article.innerHTML = `
+      <div class="entry__meta">
+        <span class="entry__index">${pad(index)}</span>
+        <span class="entry__label">${label}</span>
+      </div>
+      <div class="entry__body">${bodyHTML}</div>
+    `;
+    log.appendChild(article);
+    log.scrollTop = log.scrollHeight;
+    return article;
+  }
+
+  function setStatus(state) {
+    if (state === 'transmitting') {
+      statusLabel.innerHTML = '<span class="status-dot"></span>TRANSMITTING';
+      statusLabel.classList.add('status-live');
+    } else {
+      statusLabel.textContent = 'IDLE';
+      statusLabel.classList.remove('status-live');
+    }
+  }
+
+  function parseSseBuffer(buffer, onEvent) {
+    let sepIndex;
+    while ((sepIndex = buffer.indexOf('\n\n')) !== -1) {
+      const rawEvent = buffer.slice(0, sepIndex);
+      buffer = buffer.slice(sepIndex + 2);
+      if (rawEvent.startsWith('data: ')) {
+        onEvent(JSON.parse(rawEvent.slice(6)));
+      }
+    }
+    return buffer;
+  }
+
+  async function streamChat(requestHistory, onDelta) {
+    const res = await fetch('/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ history: requestHistory }),
+    });
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let fullText = '';
+    let sawDone = false;
+    let sawError = null;
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      buffer = parseSseBuffer(buffer, (payload) => {
+        if (payload.delta) {
+          fullText += payload.delta;
+          onDelta(fullText);
+        } else if (payload.done) {
+          sawDone = true;
+        } else if (payload.error) {
+          sawError = payload.error;
+        }
+      });
+    }
+
+    if (sawError) {
+      return { ok: false, error: sawError };
+    }
+    if (!sawDone) {
+      return { ok: false, error: 'Response was interrupted. Please try again.' };
+    }
+    return { ok: true, text: fullText };
+  }
+
+  function openPanel() {
+    opsPanel.classList.add('is-open');
+    scrim.classList.add('is-open');
+  }
+  function closePanel() {
+    opsPanel.classList.remove('is-open');
+    scrim.classList.remove('is-open');
+  }
+  panelToggle.addEventListener('click', () => {
+    opsPanel.classList.contains('is-open') ? closePanel() : openPanel();
+  });
+  scrim.addEventListener('click', closePanel);
+
+  launchers.addEventListener('click', (e) => {
+    const btn = e.target.closest('.launcher');
+    if (!btn) return;
+    input.value = btn.dataset.question;
+    input.dispatchEvent(new Event('input'));
+    input.focus();
+    closePanel();
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const text = input.value.trim();
+    if (!text) return;
+
+    entryIndex += 1;
+    appendEntry('query', entryIndex, 'QUERY', formatBody(text));
+    history.push({ role: 'user', content: text });
+    input.value = '';
+    input.style.height = 'auto';
+
+    setStatus('transmitting');
+    const startedAt = performance.now();
+    const responseArticle = appendEntry('response', entryIndex, 'RESPONSE', '<p><span class="cursor"></span></p>');
+    const responseBody = responseArticle.querySelector('.entry__body');
+
+    const result = await streamChat(history, (partialText) => {
+      responseBody.innerHTML = formatBody(partialText) + '<span class="cursor"></span>';
+      log.scrollTop = log.scrollHeight;
+    });
+
+    setStatus('idle');
+
+    if (!result.ok) {
+      responseArticle.remove();
+      appendEntry('error', entryIndex, 'ERROR', formatBody(result.error));
+      return;
+    }
+
+    responseBody.innerHTML = formatBody(result.text);
+    history.push({ role: 'model', content: result.text });
+    const elapsedSeconds = ((performance.now() - startedAt) / 1000).toFixed(1);
+    latencyLabel.textContent = `LAT: ${elapsedSeconds}s`;
+  });
+
+  input.addEventListener('input', () => {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 200) + 'px';
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      form.requestSubmit();
+    }
+  });
+</script>
+</body>
+</html>
