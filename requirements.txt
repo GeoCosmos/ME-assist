@@ -1,6 +1,7 @@
 fastapi
 uvicorn
 google-genai
+anthropic
 pydantic
 pytest
 httpx

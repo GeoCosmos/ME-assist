@@ -37,3 +37,12 @@ def test_get_response_stream_raises_llmerror_on_unknown_provider(monkeypatch):
 
     with pytest.raises(LLMError):
         list(get_response_stream([{"role": "user", "content": "hi"}]))
+
+
+def test_anthropic_provider_is_registered():
+    import llm
+    from config import ANTHROPIC_MODEL
+    from llm.anthropic import AnthropicProvider
+
+    assert llm._PROVIDERS["anthropic"] is AnthropicProvider
+    assert llm._MODELS["anthropic"] == ANTHROPIC_MODEL
