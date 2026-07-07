@@ -24,6 +24,13 @@ uvicorn main:app --reload --port 8000
 
 Open `http://127.0.0.1:8000` in a browser.
 
+## CLAUDE Skill
+
+If you want to insert the Mechanical Engineering system prompt as a claude skill:
+1. Go to the customization tab in the left dashboard of the Claude Browser
+2. Click on the Add drop down button
+3. Press upload skill and drag/drop the mechanical-engineering.zip file into the ingest area.
+
 ## Test
 
 ```bash
