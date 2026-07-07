@@ -56,7 +56,11 @@ conversation history with every call; nothing is stored server-side.
   standard fastener torque values, GD&T symbol reference, common composite
   layups/fiber-matrix properties and failure theories (max stress, Tsai-Will,
   etc.).
-- `static/index.html` — the chat UI.
+- `static/index.html` — the chat UI. Unlike Geo-Assist's utilitarian
+  frontend, this one should get real visual design attention (typography,
+  color, layout, motion/feedback on send-and-loading states) — built using
+  the `frontend-design` skill during implementation rather than a plain
+  input-box-and-bubbles default.
 
 ## System prompt design
 
