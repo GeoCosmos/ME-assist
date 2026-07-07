@@ -25,7 +25,7 @@
     --font-mono: 'IBM Plex Mono', monospace;
   }
   * { box-sizing: border-box; }
-  html, body { height: 100%; margin: 0; }
+  html, body { height: 100%; margin: 0; overflow-x: hidden; }
   body {
     background: var(--bg);
     color: var(--text);
@@ -114,6 +114,13 @@
     font-size: 11px;
     letter-spacing: 0.06em;
     color: var(--text-dim);
+    min-width: 0;
+  }
+  #model-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   .status-bar__toggle {
     display: none;
@@ -457,9 +464,11 @@
         if (payload.delta) {
           fullText += payload.delta;
           onDelta(fullText);
-        } else if (payload.done) {
+        }
+        if (payload.done) {
           sawDone = true;
-        } else if (payload.error) {
+        }
+        if (payload.error) {
           sawError = payload.error;
         }
       });
