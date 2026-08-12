@@ -18,7 +18,7 @@ from llm.base import (
 
 def fake_provider(text="answer", tokens=(100, 50), error=None):
     class Fake:
-        def get_response_stream(self, history, domain=None):
+        def get_response_stream(self, history, domain=None, sections=None):
             if error is not None:
                 raise error
             yield TextDelta(text)
@@ -98,7 +98,7 @@ def test_paid_provider_is_never_used_without_approval(monkeypatch):
     called = []
 
     class Spy:
-        def get_response_stream(self, history, domain=None):
+        def get_response_stream(self, history, domain=None, sections=None):
             called.append(True)
             yield TextDelta("should not happen")
 
@@ -189,14 +189,14 @@ def test_failure_after_first_token_does_not_fail_over(monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
 
     class HalfWay:
-        def get_response_stream(self, history, domain=None):
+        def get_response_stream(self, history, domain=None, sections=None):
             yield TextDelta("half an ")
             raise QuotaExceeded("died mid-answer")
 
     openai_called = []
 
     class Spy:
-        def get_response_stream(self, history, domain=None):
+        def get_response_stream(self, history, domain=None, sections=None):
             openai_called.append(True)
             yield TextDelta("rest of it")
 
@@ -215,7 +215,7 @@ def test_rate_limit_retries_once_then_gives_up(monkeypatch):
     attempts = []
 
     class Flaky:
-        def get_response_stream(self, history, domain=None):
+        def get_response_stream(self, history, domain=None, sections=None):
             attempts.append(True)
             raise RateLimited("slow down", retry_after=0.01)
             yield  # pragma: no cover

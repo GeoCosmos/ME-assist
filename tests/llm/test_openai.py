@@ -17,7 +17,9 @@ def _usage_chunk(prompt_tokens, completion_tokens):
     chunk = MagicMock()
     chunk.choices = []
     chunk.usage = MagicMock(
-        prompt_tokens=prompt_tokens, completion_tokens=completion_tokens
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        prompt_tokens_details=MagicMock(cached_tokens=0),
     )
     return chunk
 
@@ -36,7 +38,7 @@ def test_yields_deltas_then_usage_and_passes_system_instruction(mock_openai_cls)
     events = list(OpenAIProvider().get_response_stream(history))
 
     assert [e.text for e in events if isinstance(e, TextDelta)] == ["Use ", "Al 6061-T6."]
-    assert events[-1] == Usage("openai", "gpt-5", 1800, 500)
+    assert events[-1] == Usage("openai", "gpt-5", 1800, 500, 0)
 
     _, kwargs = mock_openai_cls.return_value.chat.completions.create.call_args
     assert kwargs["messages"][0]["role"] == "system"

@@ -26,10 +26,13 @@ class GroqProvider:
     name = "groq"
 
     def get_response_stream(
-        self, history: list[dict], domain: str | None = None
+        self,
+        history: list[dict],
+        domain: str | None = None,
+        sections: tuple[str, ...] | None = None,
     ) -> Iterator[Event]:
         model = config.get_model("groq")
-        messages = [{"role": "system", "content": build_full_system_instruction(domain, history)}]
+        messages = [{"role": "system", "content": build_full_system_instruction(domain, history, sections)}]
         messages += [
             {"role": _ROLE_MAP[turn["role"]], "content": turn["content"]}
             for turn in history
@@ -37,6 +40,7 @@ class GroqProvider:
 
         input_tokens = 0
         output_tokens = 0
+        cached_tokens = 0
 
         try:
             client = OpenAI(
@@ -60,9 +64,15 @@ class GroqProvider:
                     output_tokens = (
                         getattr(usage, "completion_tokens", 0) or output_tokens
                     )
+                    # Prompt caching is automatic; this is how we see it working.
+                    details = getattr(usage, "prompt_tokens_details", None)
+                    if details is not None:
+                        cached_tokens = (
+                            getattr(details, "cached_tokens", 0) or cached_tokens
+                        )
         except LLMError:
             raise
         except Exception as exc:
             raise classify_rate_limit(exc, "Groq") from exc
 
-        yield Usage("groq", model, input_tokens, output_tokens)
+        yield Usage("groq", model, input_tokens, output_tokens, cached_tokens)

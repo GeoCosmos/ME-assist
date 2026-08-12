@@ -18,7 +18,10 @@ class GeminiProvider:
     name = "gemini"
 
     def get_response_stream(
-        self, history: list[dict], domain: str | None = None
+        self,
+        history: list[dict],
+        domain: str | None = None,
+        sections: tuple[str, ...] | None = None,
     ) -> Iterator[Event]:
         model = config.get_model("gemini")
         prior_turns = [
@@ -29,13 +32,14 @@ class GeminiProvider:
 
         input_tokens = 0
         output_tokens = 0
+        cached_tokens = 0
 
         try:
             client = genai.Client(api_key=config.get_api_key("gemini"))
             chat = client.chats.create(
                 model=model,
                 config=types.GenerateContentConfig(
-                    system_instruction=build_full_system_instruction(domain, history),
+                    system_instruction=build_full_system_instruction(domain, history, sections),
                 ),
                 history=prior_turns,
             )
@@ -49,9 +53,12 @@ class GeminiProvider:
                     output_tokens = (
                         getattr(meta, "candidates_token_count", 0) or output_tokens
                     )
+                    cached_tokens = (
+                        getattr(meta, "cached_content_token_count", 0) or cached_tokens
+                    )
         except LLMError:
             raise
         except Exception as exc:
             raise classify_rate_limit(exc, "Gemini") from exc
 
-        yield Usage("gemini", model, input_tokens, output_tokens)
+        yield Usage("gemini", model, input_tokens, output_tokens, cached_tokens)

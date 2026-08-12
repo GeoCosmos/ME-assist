@@ -199,10 +199,16 @@ def init_db(path: Path | None = None) -> None:
                 input_tokens INTEGER NOT NULL DEFAULT 0,
                 output_tokens INTEGER NOT NULL DEFAULT 0,
                 cost_usd REAL NOT NULL DEFAULT 0,
-                billable INTEGER NOT NULL DEFAULT 1
+                billable INTEGER NOT NULL DEFAULT 1,
+                cached_tokens INTEGER NOT NULL DEFAULT 0
             )
             """
         )
+        # Existing databases predate the column; adding it is cheap and safe.
+        try:
+            conn.execute("ALTER TABLE events ADD COLUMN cached_tokens INTEGER NOT NULL DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass  # already present
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_events_day ON events (quota_day, provider)"
         )
@@ -256,6 +262,7 @@ def record(
     output_tokens: int,
     conversation_id: str | None = None,
     billable: bool = True,
+    cached_tokens: int = 0,
 ) -> float:
     """Append one turn to the ledger. Returns its cost in USD.
 
@@ -269,8 +276,9 @@ def record(
                 """
                 INSERT INTO events
                     (ts, quota_day, provider, model, conversation_id,
-                     input_tokens, output_tokens, cost_usd, billable)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     input_tokens, output_tokens, cost_usd, billable,
+                     cached_tokens)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     now_pacific().isoformat(),
@@ -282,6 +290,7 @@ def record(
                     output_tokens,
                     cost,
                     int(billable),
+                    cached_tokens,
                 ),
             )
     except sqlite3.Error:
@@ -309,6 +318,33 @@ def tokens_today(provider: str) -> int:
             (quota_day(), provider),
         ).fetchone()
     return row["n"] if row else 0
+
+
+def cache_stats(provider: str) -> dict:
+    """How much of today's input was served from the provider's prompt cache.
+
+    Reported rather than assumed: whether cached tokens are exempt from a free
+    tier's daily allowance is a claim best checked against the provider's own
+    dashboard, and this is the number to check it with.
+    """
+    with _connect() as conn:
+        row = conn.execute(
+            """
+            SELECT COALESCE(SUM(input_tokens), 0) AS tin,
+                   COALESCE(SUM(cached_tokens), 0) AS cached,
+                   COUNT(*) AS turns
+            FROM events WHERE quota_day = ? AND provider = ?
+            """,
+            (quota_day(), provider),
+        ).fetchone()
+    total = row["tin"] or 0
+    cached = row["cached"] or 0
+    return {
+        "input_tokens": total,
+        "cached_tokens": cached,
+        "hit_rate": round(cached / total, 3) if total else 0.0,
+        "turns": row["turns"],
+    }
 
 
 def tokens_remaining(provider: str) -> int | None:
@@ -422,6 +458,7 @@ def free_summary() -> dict[str, dict]:
             "tokens_remaining": tokens_remaining(provider),
             "tokens_limit": config.free_tier_tpd(provider),
             "tokens_used": tokens_today(provider),
+            "cache": cache_stats(provider),
             "configured": config.is_configured(provider),
         }
         for provider in config.FREE_TIERS

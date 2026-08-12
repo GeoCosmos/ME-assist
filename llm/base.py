@@ -35,6 +35,10 @@ class Usage:
     model: str
     input_tokens: int
     output_tokens: int
+    # Input tokens served from the provider's prompt cache. Reported so the
+    # effect of caching can be measured against the provider's own dashboard
+    # rather than assumed.
+    cached_tokens: int = 0
 
 
 @dataclass(frozen=True)
@@ -97,8 +101,27 @@ def latest_question(history: list[dict] | None) -> str:
     return ""
 
 
+def anchor_question(history: list[dict] | None) -> str:
+    """The FIRST user message, not the latest.
+
+    Reference sections are chosen from this so the system prompt stays byte
+    identical for the whole conversation. Providers cache on an exact prefix
+    match, so a prompt that changes every turn never hits the cache -- and on a
+    token-metered free tier a cache hit is worth more than a slightly better
+    choice of tables.
+    """
+    if not history:
+        return ""
+    for turn in history:
+        if turn.get("role") == "user":
+            return turn.get("content", "")
+    return ""
+
+
 def build_full_system_instruction(
-    domain: str | None = None, history: list[dict] | None = None
+    domain: str | None = None,
+    history: list[dict] | None = None,
+    sections: tuple[str, ...] | None = None,
 ) -> str:
     """System prompt, plus the discipline brief and the reference tables.
 
@@ -117,10 +140,10 @@ def build_full_system_instruction(
     if domain_prompt:
         parts.append(domain_prompt)
 
-    sections = domains.get_sections(domain)
-    if sections is None:
-        sections = reference_data.select_sections(latest_question(history))
-    parts.append(reference_data.build(sections))
+    chosen = domains.get_sections(domain)
+    if chosen is None:
+        chosen = sections or reference_data.select_sections(anchor_question(history))
+    parts.append(reference_data.build(chosen))
     return "\n\n".join(parts)
 
 

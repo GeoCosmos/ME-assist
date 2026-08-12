@@ -14,11 +14,13 @@ def _chunk(text):
     return chunk
 
 
-def _usage_chunk(prompt_tokens, completion_tokens):
+def _usage_chunk(prompt_tokens, completion_tokens, cached=0):
     chunk = MagicMock()
     chunk.choices = []
     chunk.usage = MagicMock(
-        prompt_tokens=prompt_tokens, completion_tokens=completion_tokens
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        prompt_tokens_details=MagicMock(cached_tokens=cached),
     )
     return chunk
 
@@ -44,7 +46,7 @@ def test_yields_deltas_then_usage(mock_openai_cls):
     events = list(GroqProvider().get_response_stream([{"role": "user", "content": "hi"}]))
 
     assert [e.text for e in events if isinstance(e, TextDelta)] == ["Use ", "Al 6061-T6."]
-    assert events[-1] == Usage("groq", "llama-3.3-70b-versatile", 1700, 450)
+    assert events[-1] == Usage("groq", "llama-3.3-70b-versatile", 1700, 450, 0)
 
 
 @patch("llm.groq.OpenAI")
@@ -65,3 +67,16 @@ def test_raises_llmerror_on_api_failure(mock_openai_cls):
 
     with pytest.raises(LLMError):
         list(GroqProvider().get_response_stream([{"role": "user", "content": "hi"}]))
+
+
+@patch("llm.groq.OpenAI")
+def test_cached_tokens_are_reported(mock_openai_cls):
+    """Groq caches automatically; this is how we can see whether it is working."""
+    mock_openai_cls.return_value.chat.completions.create.return_value = iter(
+        [_chunk("hi"), _usage_chunk(3000, 200, cached=2600)]
+    )
+
+    events = list(GroqProvider().get_response_stream([{"role": "user", "content": "hi"}]))
+
+    assert events[-1].cached_tokens == 2600
+    assert events[-1].input_tokens == 3000
