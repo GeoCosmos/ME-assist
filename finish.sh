@@ -69,6 +69,25 @@ for f in llm.py usage.db; do
 done
 ok "no stale llm.py or usage.db tracked"
 
+# --- 2b. untrack files that should never have been committed -------------
+# .gitignore only prevents *new* files being added; it does not untrack
+# anything already committed. These are FUSE artefacts -- orphaned copies of
+# open files that could not be unlinked -- and local runtime data.
+say "Checking for junk that got committed"
+JUNK=$(git ls-files | grep -E '^\.fuse_hidden|^usage\.db|\.broken$' || true)
+if [ -n "$JUNK" ]; then
+  COUNT=$(printf '%s\n' "$JUNK" | wc -l | tr -d ' ')
+  printf '    removing %s tracked file(s) from the repository:\n' "$COUNT"
+  printf '%s\n' "$JUNK" | sed 's/^/      /'
+  # --cached keeps them on disk; they are ignored from now on.
+  printf '%s\n' "$JUNK" | while read -r f; do
+    [ -n "$f" ] && git rm --cached --quiet -- "$f" || true
+  done
+  ok "untracked (files remain on disk, now ignored)"
+else
+  ok "nothing untoward is tracked"
+fi
+
 # --- 3. tests ------------------------------------------------------------
 # Clear accumulated pytest temp directories first. pytest normally prunes to
 # the last three, but if a run dies from descriptor exhaustion the cleanup is

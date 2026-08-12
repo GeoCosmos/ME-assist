@@ -14,6 +14,9 @@ usage.db-wal
 usage.db-shm
 usage.db-journal
 
+# Quarantined databases (created when a corrupt usage.db is set aside)
+*.broken
+
 # Environment / secrets
 .env
 .env.*
@@ -21,21 +24,14 @@ usage.db-journal
 
 # macOS
 .DS_Store
-.fuse_hidden*
 
-# IDEs
-.vscode/
-.idea/
+# FUSE artefacts: a file deleted while still open gets renamed to this
+# instead of being unlinked. They are orphaned data, never source.
+.fuse_hidden*
 
 # Node (UI test dependencies)
 node_modules/
 
-# Quarantined databases
-*.broken
-
-
-
-
-
-
-#Storage
+# IDEs
+.vscode/
+.idea/
