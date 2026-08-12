@@ -118,19 +118,59 @@ MSG
   ok "committed"
 fi
 
-# --- 5. merge origin/main ------------------------------------------------
-say "Fetching and merging origin/main"
+# --- 5. merge remote work ------------------------------------------------
+# A .gitignore conflict resolves safely to the union of both sides: ignoring a
+# path that the other branch also wanted ignored cannot lose anything. This is
+# true of .gitignore specifically and is NOT generalised to other files.
+resolve_gitignore_union() {
+  git show :2:.gitignore > /tmp/ours.gitignore 2>/dev/null || return 1
+  git show :3:.gitignore > /tmp/theirs.gitignore 2>/dev/null || return 1
+  cat /tmp/ours.gitignore /tmp/theirs.gitignore \
+    | grep -v '^[<>=]\{7\}' \
+    | awk '!seen[$0]++ || $0 == ""' > .gitignore
+  rm -f /tmp/ours.gitignore /tmp/theirs.gitignore
+  git add .gitignore
+  return 0
+}
+
+merge_ref() {
+  local ref="$1"
+  local behind
+  behind=$(git rev-list --count "HEAD..$ref" 2>/dev/null || echo 0)
+  if [ "$behind" = "0" ]; then
+    ok "already up to date with $ref"
+    return 0
+  fi
+  printf '    %s commit(s) to merge from %s\n' "$behind" "$ref"
+  if git merge --no-edit "$ref"; then
+    ok "merged $ref cleanly"
+  else
+    # Only .gitignore is auto-resolvable; anything else needs a human.
+    local unmerged
+    unmerged=$(git diff --name-only --diff-filter=U)
+    if [ "$unmerged" = ".gitignore" ] && resolve_gitignore_union; then
+      git commit --no-edit
+      ok "merged $ref (.gitignore resolved to the union of both sides)"
+    else
+      die "conflict in: $(echo "$unmerged" | tr '\n' ' ')— resolve, then re-run."
+    fi
+  fi
+  $PY -m pytest tests/ -q || die "tests failed AFTER merging $ref. Do not push."
+  ok "tests still pass after merging $ref"
+}
+
+say "Fetching"
 git fetch origin
-BEHIND=$(git rev-list --count "$BRANCH"..origin/main)
-if [ "$BEHIND" = "0" ]; then
-  ok "already up to date with origin/main"
-else
-  printf '    %s commit(s) to merge\n' "$BEHIND"
-  git merge --no-edit origin/main || die "merge hit a conflict. Resolve it, then re-run this script."
-  ok "merged cleanly"
-  $PY -m pytest tests/ -q || die "tests failed AFTER the merge. Do not push. Investigate first."
-  ok "tests still pass after the merge"
+
+# Your own remote branch first -- it may have moved (e.g. a merge done on
+# GitHub), and pushing without it is what causes a non-fast-forward rejection.
+if git rev-parse --verify "origin/$BRANCH" >/dev/null 2>&1; then
+  say "Merging origin/$BRANCH"
+  merge_ref "origin/$BRANCH"
 fi
+
+say "Merging origin/main"
+merge_ref origin/main
 
 # --- 6. push -------------------------------------------------------------
 say "Ready to push to origin/$BRANCH"
