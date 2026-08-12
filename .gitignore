@@ -10,6 +10,9 @@ env/
 
 # Local database / runtime data
 usage.db
+usage.db-wal
+usage.db-shm
+usage.db-journal
 
 # Environment / secrets
 .env
@@ -18,16 +21,13 @@ usage.db
 
 # macOS
 .DS_Store
+.fuse_hidden*
 
 # IDEs
 .vscode/
 .idea/
 
-#Storage
-usage.db
-.fuse_hidden*
-
-# Node (UI test deps)
+# Node (UI test dependencies)
 node_modules/
 
 # Quarantined databases

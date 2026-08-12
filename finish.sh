@@ -39,11 +39,24 @@ BRANCH=$(git rev-parse --abbrev-ref HEAD)
 ok "on branch $BRANCH"
 
 if grep -rln '^<<<<<<< \|^>>>>>>> ' --include='*.py' --include='*.txt' \
-     --include='*.md' --include='*.html' --include='*.js' . 2>/dev/null \
+     --include='*.md' --include='*.html' --include='*.js' --include='.gitignore' . 2>/dev/null \
      | grep -v venv | grep -q .; then
   die "conflict markers are still in the working tree."
 fi
 ok "no conflict markers"
+
+# An interrupted merge whose conflicts are now resolved should be completed,
+# not started over.
+if [ -f .git/MERGE_HEAD ]; then
+  say "Finishing the merge that was interrupted"
+  # Git keeps a path flagged "unresolved" until it is staged, so that flag is
+  # not the test -- the absence of conflict markers, checked above, is.
+  UNMERGED=$(git diff --name-only --diff-filter=U | tr '\n' ' ')
+  [ -n "$UNMERGED" ] && printf '    resolving: %s\n' "$UNMERGED"
+  git add -A
+  git commit --no-edit
+  ok "merge committed"
+fi
 
 # --- 2. secrets ----------------------------------------------------------
 say "Making sure no secrets are about to be committed"
