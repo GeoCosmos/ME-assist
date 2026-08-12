@@ -74,11 +74,12 @@ a running dollar total ticks up beside it, so it is not possible to forget you
 are billing.
 
 **Per-minute limits do not cost you money.** Free tiers cap requests per minute
-and *tokens* per minute as well as per day. On Groq the token budget (~6,000/min)
-is the binding one: it is smaller than one full-reference-sheet prompt, which is
-why the reference tables are selected per question rather than sent whole. The app paces its own requests locally against the
-published limits, so it steps aside *before* sending rather than burning a 429
-to find out. If one free tier is minute-limited it tries the other; if all free
+and *tokens* per minute as well as per day, and on Groq the token budget
+(~6,000/min) is the binding one — which is why the reference tables are
+selected per question rather than sent whole.
+
+The app paces its own requests locally against the published limits, so it
+steps aside *before* sending rather than burning a 429 to find out. If one free tier is minute-limited it tries the other; if all free
 tiers are busy it waits out the window (up to `MAX_FREE_WAIT_SECONDS`, default
 25) and tells you it's waiting. Only when free capacity is genuinely minutes
 away does it ask about paying — and that card says "rate limited", not "quota
@@ -109,10 +110,15 @@ tables. The starter questions inside the panel are optional; clicking one fills
 the input, but the section is what changes the answer.
 
 That makes answers both more specific and cheaper. With no section selected the
-tables are chosen by keyword from your question (~3,100–3,800 tokens); with a
-section selected you get that discipline's full tables and brief. Either way a
-turn stays under Groq's 6,000 tokens/minute budget — sending all thirteen
-sections (~8,900 tokens) would exceed what one request is allowed to use.
+tables are chosen by keyword from your question (2,300–4,700 tokens depending on
+what it matches); with a section selected you get that discipline's brief plus
+its own tables (3,400–4,600).
+
+Every mode is sized to leave room for a full answer inside Groq's 6,000
+tokens/minute budget — the whole sheet at once would be ~9,700 tokens, more
+than a single request is allowed. A test enforces this, and it must use the
+calibrated token ratio: the usual chars/4 rule of thumb is about 17% optimistic
+for dense tables and hid two disciplines that genuinely overran.
 
 ## Choosing which provider answers
 
@@ -126,9 +132,18 @@ was changed on a provider that never gets reached.
 
 ## Conversations
 
-Transcripts are saved in your browser and survive a refresh, per section. The
-paid-provider approval is deliberately **not** saved — a reload never inherits
-permission to spend.
+Transcripts are saved in your browser and last **as long as the server is
+running**. Refreshing the page, and moving between discipline sections, keeps
+everything. Stopping the server (closing its window) clears them on next load.
+
+That is deliberate: conversations here are working notes rather than records,
+so they should not pile up indefinitely — but losing one because you clicked a
+tab would be maddening. The server generates a session id at startup and the
+browser stores transcripts against it; a new id means a new run, and only then
+is the old state discarded.
+
+The paid-provider approval is separately **never** saved — a reload never
+inherits permission to spend.
 
 **NEW** in the status bar clears the current conversation and starts a fresh
 one. Worth using often: the entire history is re-sent with every question, so a
@@ -214,11 +229,12 @@ settings endpoint can write API keys.
 
 ## Troubleshooting
 
-**`sqlite3.OperationalError: unable to open database file`** — the usage ledger
-(`usage.db`) is unreadable or its folder is not writable. The app now
-quarantines a broken file as `usage.db.broken` and falls back to a writable
-location, so this should self-heal. If it persists, delete `usage.db`,
-`usage.db-journal` and `usage.db-wal` and restart; you lose only cost history.
+**`sqlite3.OperationalError: unable to open database file`** — usually means
+the process ran out of file descriptors rather than anything being wrong with
+the file (macOS defaults to 256). That leak is fixed, and the ledger now also
+quarantines a genuinely corrupt database as `usage.db.broken`, falls back to a
+writable location, and degrades to "no data" rather than failing a request. If
+it somehow persists, delete `usage.db*` and restart; you lose only cost history.
 
 **The transcript scrolls under the input box** — fixed; hard-refresh once if you
 had the page open from before.
@@ -229,10 +245,16 @@ Note it is `gemini-3.6-flash`, not `gemini-3-flash`.
 ## Tests
 
 ```bash
-pytest tests/ -v                     # backend
-node tests/test_ui_markdown.js       # answer rendering (no dependencies)
-node tests/test_ui_workspaces.js     # UI behaviour (needs: npm i jsdom)
+pytest tests/ -q                     # 169 backend tests
+node tests/test_ui_markdown.js       # 15 rendering tests (no dependencies)
+node tests/test_ui_workspaces.js     # 42 UI tests (needs: npm i jsdom)
 ```
+
+The UI tests run the real page in a headless DOM with a stubbed server, so
+they cover the things unit tests cannot: that a discipline switch does not leak
+one conversation's history into another, that a reload restores transcripts,
+that stopping the server clears them, and that a numbered list renders as
+1/2/3 rather than 1/1/1.
 
 ## Claude skill
 

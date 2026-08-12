@@ -1,4 +1,5 @@
 import json
+import uuid
 from collections.abc import Iterator
 from dataclasses import asdict
 
@@ -25,6 +26,13 @@ from llm import (
 )
 
 app = FastAPI()
+
+# Regenerated every time the process starts. The browser stores transcripts
+# against this value, so stopping the server clears them on next load, while a
+# refresh or a move between discipline sections keeps them. Conversations are
+# working notes, not records -- but losing them because you clicked a tab would
+# be infuriating.
+SERVER_SESSION = uuid.uuid4().hex
 
 
 class Message(BaseModel):
@@ -162,6 +170,7 @@ def chat(request: ChatRequest):
 def model_info():
     active = free_provider() or (available_providers() or [None])[0]
     return {
+        "server_session": SERVER_SESSION,
         "provider": active or config.primary_provider(),
         "name": config.DISPLAY_NAMES.get(active, ""),
         "model": config.get_model(active) if active else current_model(),

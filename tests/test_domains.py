@@ -71,13 +71,20 @@ def test_no_mode_ever_ships_the_complete_sheet():
 
 
 def test_every_mode_fits_a_small_per_minute_token_budget():
-    """Groq's free tier allows 6,000 tokens per minute, including the answer."""
+    """Groq's free tier allows 6,000 tokens per minute, including the answer.
+
+    Must use the calibrated ratio, not the chars/4 rule of thumb: measured
+    against real billing this prompt runs about 17% denser than that, and using
+    the optimistic figure hid two disciplines that actually overran the budget.
+    """
+    import usage
+
     budget = 6000
     reserve_for_answer = 900
 
     modes = [None] + list(domains.DOMAIN_ORDER)
     for key in modes:
-        tokens = len(build_full_system_instruction(key)) // 4
+        tokens = int(len(build_full_system_instruction(key)) / usage.CHARS_PER_TOKEN)
         assert tokens + reserve_for_answer < budget, f"{key} = {tokens} tokens"
 
 

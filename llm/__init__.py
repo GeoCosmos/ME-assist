@@ -88,10 +88,6 @@ def next_paid_provider(exclude: tuple[str, ...] = ()) -> str | None:
     return None
 
 
-def is_free(provider: str) -> bool:
-    return usage_ledger.free_tier_available(provider)
-
-
 def _switch_event(
     from_provider: str | None,
     to_provider: str,

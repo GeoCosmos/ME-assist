@@ -788,6 +788,20 @@
   // Transcripts survive a page refresh. Stored locally in the browser; the
   // paid-provider approval is deliberately excluded.
   const STORE_KEY = 'me-assist.workspaces.v1';
+  // Transcripts belong to one run of the server. Stopping it clears them;
+  // refreshing or switching sections does not.
+  const SESSION_KEY = 'me-assist.server-session';
+
+  function discardIfServerRestarted(serverSession) {
+    if (!serverSession) return false;          // unknown: keep, never guess
+    const previous = localStorage.getItem(SESSION_KEY);
+    localStorage.setItem(SESSION_KEY, serverSession);
+    if (previous && previous !== serverSession) {
+      localStorage.removeItem(STORE_KEY);
+      return true;
+    }
+    return false;
+  }
 
   function saveState() {
     try {
@@ -1497,13 +1511,25 @@
     })
     .catch(() => {});
 
-  // Restore saved transcripts, then open whichever workspace was last active.
-  const restoredKey = restoreState();
-  if (restoredKey && restoredKey !== GENERAL) {
-    activeDomain = restoredKey;
-    renderDomains();
+  // Boot order matters: decide whether the saved transcripts are still valid
+  // BEFORE restoring any of them. Doing it the other way round would briefly
+  // show a stale conversation and then blank it.
+  function boot() {
+    return fetch('/model-info')
+      .then((res) => res.json())
+      .then((info) => discardIfServerRestarted(info.server_session))
+      .catch(() => false)          // server unreachable: keep what we have
+      .then(() => {
+        const restoredKey = restoreState();
+        if (restoredKey && restoredKey !== GENERAL) {
+          activeDomain = restoredKey;
+          renderDomains();
+        }
+        showWorkspace(restoredKey || GENERAL);
+      });
   }
-  showWorkspace(restoredKey || GENERAL);
+
+  boot();
 
   document.getElementById('stop-btn').addEventListener('click', () => {
     if (inFlight) inFlight.abort();

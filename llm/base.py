@@ -92,15 +92,6 @@ PROBE_DOMAIN = "__probe__"
 PROBE_INSTRUCTION = "Connectivity check. Reply with exactly: ok"
 
 
-def latest_question(history: list[dict] | None) -> str:
-    if not history:
-        return ""
-    for turn in reversed(history):
-        if turn.get("role") == "user":
-            return turn.get("content", "")
-    return ""
-
-
 def anchor_question(history: list[dict] | None) -> str:
     """The FIRST user message, not the latest.
 

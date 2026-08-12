@@ -35,3 +35,8 @@ node_modules/
 # IDEs
 .vscode/
 .idea/
+
+# Local scaffolding — helper scripts and notes for one-off situations.
+# Useful on this machine, not part of the project.
+finish.sh
+RESTORE.md

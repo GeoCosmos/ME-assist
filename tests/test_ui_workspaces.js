@@ -41,6 +41,7 @@ function sseBody(events) {
 }
 
 const STORE = {};
+let SERVER_SESSION = 'session-one';
 
 async function boot(opts = {}) {
   const sent = [];
@@ -59,6 +60,7 @@ async function boot(opts = {}) {
         if (String(url).startsWith('/model-info')) {
           return Promise.resolve({
             json: () => Promise.resolve({
+              server_session: SERVER_SESSION,
               provider: 'groq', name: 'Groq', model: 'llama-3.3-70b-versatile',
               free: true, chain: ['groq'], free_remaining: 14400, free_limit: 14400,
               free_tiers: {}, resets_at: null,
@@ -299,6 +301,44 @@ function checkLayoutRules() {
     afterReset.history.length === 1 && afterReset.history[0].content === 'after reset');
   check('NEW starts a new conversation id',
     afterReset.conversation_id !== staticsCall.conversation_id);
+
+  // --- transcript lifetime ---
+  console.log('\nTranscript lifetime\n');
+
+  // Same server run: a reload must keep everything.
+  const sameRun = await boot();
+  await settle();
+  check('a reload during the same server run keeps the transcript',
+    visibleQueries(sameRun.doc).length > 0,
+    `saw: ${JSON.stringify(visibleQueries(sameRun.doc))}`);
+
+  // Switching sections must not clear anything either.
+  clickSection(sameRun.doc, sameRun.window, 'statics');
+  await settle();
+  clickSection(sameRun.doc, sameRun.window, 'statics');   // back out
+  await settle();
+  const generalAfterTabs = visibleQueries(sameRun.doc);
+  check('moving between sections does not clear history',
+    generalAfterTabs.length > 0,
+    `saw: ${JSON.stringify(generalAfterTabs)}`);
+
+  // Now simulate stopping and restarting the server.
+  SERVER_SESSION = 'session-two';
+  const afterRestart = await boot();
+  await settle();
+  check('restarting the server clears the transcript',
+    visibleQueries(afterRestart.doc).length === 0,
+    `saw: ${JSON.stringify(visibleQueries(afterRestart.doc))}`);
+  check('and clears every section, not just the visible one',
+    afterRestart.doc.querySelectorAll('.entry--query').length === 0);
+
+  // A second reload on the SAME restarted server keeps the new transcript.
+  await ask(afterRestart.doc, afterRestart.window, 'question after restart');
+  const secondReload = await boot();
+  await settle();
+  check('the new run then persists across a reload as normal',
+    visibleQueries(secondReload.doc).includes('question after restart'),
+    `saw: ${JSON.stringify(visibleQueries(secondReload.doc))}`);
 
   console.log(`\n${results.pass} passed, ${results.fail} failed\n`);
   process.exit(results.fail ? 1 : 0);
