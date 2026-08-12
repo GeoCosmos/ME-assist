@@ -11,7 +11,11 @@ def _stream_cm(texts, input_tokens=2000, output_tokens=600):
     entered = cm.__enter__.return_value
     entered.text_stream = iter(texts)
     entered.get_final_message.return_value = MagicMock(
-        usage=MagicMock(input_tokens=input_tokens, output_tokens=output_tokens)
+        usage=MagicMock(
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cache_read_input_tokens=0,
+        )
     )
     return cm
 
@@ -30,7 +34,7 @@ def test_yields_deltas_then_usage_and_passes_system_instruction(mock_anthropic_c
     events = list(AnthropicProvider().get_response_stream(history))
 
     assert [e.text for e in events if isinstance(e, TextDelta)] == ["Use ", "Al 6061-T6."]
-    assert events[-1] == Usage("anthropic", "claude-sonnet-5", 2000, 600)
+    assert events[-1] == Usage("anthropic", "claude-sonnet-5", 2000, 600, 0)
 
     _, kwargs = mock_anthropic_cls.return_value.messages.stream.call_args
     assert "mechanical engineering assistant" in kwargs["system"].lower()

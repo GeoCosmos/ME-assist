@@ -142,6 +142,24 @@ had a tab open from before an update, hard-refresh once
 You are on the current UI if the left panel says **DISCIPLINE** at the top and
 there is an **API KEYS** button in the status bar.
 
+## Prompt caching
+
+Groq and the paid providers cache repeated prompt prefixes automatically — no
+configuration needed, 2-hour TTL, and a cache hit requires the prefix to match
+**exactly**.
+
+That is why reference sections are chosen from the *first* question in a
+conversation and then held fixed, rather than re-picked each turn: a prompt that
+changes every turn never hits the cache. The system prompt is ~2,300–4,900
+tokens and sits first, so it is the cacheable part; only your new question and
+the recent history vary.
+
+Reported cache hit rates on Groq suggest cached tokens are discounted and may
+not count against rate limits, which would meaningfully stretch the daily token
+budget. Rather than assume that, the app records cached tokens per turn and
+shows the hit rate in the settings panel — compare it against your provider
+dashboard to see what is actually happening on your account.
+
 ## Cost tracking
 
 Every turn's token counts and cost are written to a local SQLite ledger

@@ -4,6 +4,8 @@ Everything is persisted to a local SQLite file so counts survive restarts and
 stay correct when uvicorn runs with more than one worker.
 """
 
+import contextlib
+import functools
 import os
 import sqlite3
 import sys
@@ -62,6 +64,39 @@ CHARS_PER_TOKEN = 3.3
 # which takes the lock again.
 _write_lock = threading.RLock()
 _initialised: set[str] = set()
+_warned = False
+
+
+def _never_fails(default):
+    """Ledger access must never break answering a question.
+
+    The ledger is bookkeeping. If the database is unreadable -- a bad file, a
+    read-only folder, a locked index -- the honest failure mode is to lose the
+    accounting, not to refuse the user an answer.
+
+    Note the safe direction: a read that fails returns "nothing recorded", so a
+    free tier looks fully available. That risks overrunning a daily budget, but
+    the provider's own 429 is the real backstop, and the alternative is the app
+    refusing to work at all.
+    """
+    def decorate(fn):
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            global _warned
+            try:
+                return fn(*args, **kwargs)
+            except (sqlite3.Error, OSError) as exc:
+                if not _warned:
+                    _warned = True
+                    print(
+                        f"  [usage ledger unavailable: {exc}]\n"
+                        f"  Cost tracking is disabled for this session; "
+                        f"answers are unaffected.",
+                        file=sys.stderr,
+                    )
+                return default() if callable(default) else default
+        return wrapper
+    return decorate
 
 # The file actually in use, which may differ from DB_PATH if that one was
 # unusable. _configured_path tracks what DB_PATH was when we resolved, so a
@@ -102,16 +137,52 @@ def _fallback_path() -> Path:
         return Path(tempfile.gettempdir()) / "me-assist-usage.db"
 
 
+def _wants_wal(path: Path) -> bool:
+    """WAL is for the real, long-lived database only.
+
+    It costs two extra files (-wal, -shm) and two extra file descriptors per
+    connection. Under a test run that creates a fresh database per test, that
+    multiplies into thousands of files and can exhaust the process descriptor
+    limit -- which macOS sets at 256 by default, and which SQLite then reports
+    as the thoroughly misleading "unable to open database file".
+    """
+    text = str(path)
+    return not (
+        "pytest" in text
+        or text.startswith(tempfile.gettempdir())
+        or "/tmp/" in text
+    )
+
+
 def _open(path: Path) -> sqlite3.Connection:
     conn = sqlite3.connect(path, check_same_thread=False, timeout=10)
     conn.row_factory = sqlite3.Row
-    try:
-        # WAL lets concurrent uvicorn workers read while one writes, but it is
-        # unsupported on some network/mounted filesystems -- fall back quietly.
-        conn.execute("PRAGMA journal_mode=WAL")
-    except sqlite3.OperationalError:
-        pass
+    if _wants_wal(path):
+        try:
+            # WAL lets concurrent uvicorn workers read while one writes, but it
+            # is unsupported on some network/mounted filesystems -- fall back
+            # quietly.
+            conn.execute("PRAGMA journal_mode=WAL")
+        except sqlite3.OperationalError:
+            pass
     return conn
+
+
+@contextlib.contextmanager
+def _db():
+    """Open the ledger, commit on success, and ALWAYS close.
+
+    `with sqlite3.connect(...) as conn:` commits the transaction but does *not*
+    close the connection -- a well-known trap. Relying on refcounting to clean
+    up works until it doesn't, and the failure mode is descriptor exhaustion
+    far away from the cause.
+    """
+    conn = _connect()
+    try:
+        with conn:
+            yield conn
+    finally:
+        conn.close()
 
 
 def _quarantine(path: Path) -> None:
@@ -130,10 +201,16 @@ def _quarantine(path: Path) -> None:
 
 
 def _usable(path: Path) -> bool:
+    """Is this file actually a working database?
+
+    Must read the schema, not just evaluate an expression: `SELECT 1` never
+    touches the file header, so a corrupt or zero-length database sails through
+    it and only explodes later on a real query.
+    """
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        with _open(path) as conn:
-            conn.execute("SELECT 1")
+        with contextlib.closing(_open(path)) as conn:
+            conn.execute("SELECT count(*) FROM sqlite_master").fetchone()
         return True
     except (sqlite3.Error, OSError):
         return False
@@ -184,9 +261,11 @@ def _connect() -> sqlite3.Connection:
     return _open(path)
 
 
+@_never_fails(None)
 def init_db(path: Path | None = None) -> None:
     path = Path(path or DB_PATH)
-    with _write_lock, _open(path) as conn:
+    conn = _open(path)
+    with _write_lock, contextlib.closing(conn), conn:
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS events (
@@ -199,10 +278,18 @@ def init_db(path: Path | None = None) -> None:
                 input_tokens INTEGER NOT NULL DEFAULT 0,
                 output_tokens INTEGER NOT NULL DEFAULT 0,
                 cost_usd REAL NOT NULL DEFAULT 0,
-                billable INTEGER NOT NULL DEFAULT 1
+                billable INTEGER NOT NULL DEFAULT 1,
+                cached_tokens INTEGER NOT NULL DEFAULT 0
             )
             """
         )
+        # Existing databases predate the column; adding it is cheap and safe.
+        try:
+            conn.execute(
+                "ALTER TABLE events ADD COLUMN cached_tokens INTEGER NOT NULL DEFAULT 0"
+            )
+        except sqlite3.OperationalError:
+            pass  # already present
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_events_day ON events (quota_day, provider)"
         )
@@ -256,6 +343,7 @@ def record(
     output_tokens: int,
     conversation_id: str | None = None,
     billable: bool = True,
+    cached_tokens: int = 0,
 ) -> float:
     """Append one turn to the ledger. Returns its cost in USD.
 
@@ -264,13 +352,14 @@ def record(
     """
     cost = cost_of(model, input_tokens, output_tokens) if billable else 0.0
     try:
-        with _write_lock, _connect() as conn:
+        with _write_lock, _db() as conn:
             conn.execute(
                 """
                 INSERT INTO events
                     (ts, quota_day, provider, model, conversation_id,
-                     input_tokens, output_tokens, cost_usd, billable)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     input_tokens, output_tokens, cost_usd, billable,
+                     cached_tokens)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     now_pacific().isoformat(),
@@ -282,6 +371,7 @@ def record(
                     output_tokens,
                     cost,
                     int(billable),
+                    cached_tokens,
                 ),
             )
     except sqlite3.Error:
@@ -289,8 +379,9 @@ def record(
     return cost
 
 
+@_never_fails(0)
 def requests_today(provider: str) -> int:
-    with _connect() as conn:
+    with _db() as conn:
         row = conn.execute(
             "SELECT COUNT(*) AS n FROM events WHERE quota_day = ? AND provider = ?",
             (quota_day(), provider),
@@ -298,9 +389,10 @@ def requests_today(provider: str) -> int:
     return row["n"] if row else 0
 
 
+@_never_fails(0)
 def tokens_today(provider: str) -> int:
     """Tokens spent today. On a token-metered free tier this is the real meter."""
-    with _connect() as conn:
+    with _db() as conn:
         row = conn.execute(
             """
             SELECT COALESCE(SUM(input_tokens + output_tokens), 0) AS n
@@ -309,6 +401,34 @@ def tokens_today(provider: str) -> int:
             (quota_day(), provider),
         ).fetchone()
     return row["n"] if row else 0
+
+
+@_never_fails(lambda: {"input_tokens": 0, "cached_tokens": 0, "hit_rate": 0.0, "turns": 0})
+def cache_stats(provider: str) -> dict:
+    """How much of today's input was served from the provider's prompt cache.
+
+    Reported rather than assumed: whether cached tokens are exempt from a free
+    tier's daily allowance is a claim best checked against the provider's own
+    dashboard, and this is the number to check it with.
+    """
+    with _db() as conn:
+        row = conn.execute(
+            """
+            SELECT COALESCE(SUM(input_tokens), 0) AS tin,
+                   COALESCE(SUM(cached_tokens), 0) AS cached,
+                   COUNT(*) AS turns
+            FROM events WHERE quota_day = ? AND provider = ?
+            """,
+            (quota_day(), provider),
+        ).fetchone()
+    total = row["tin"] or 0
+    cached = row["cached"] or 0
+    return {
+        "input_tokens": total,
+        "cached_tokens": cached,
+        "hit_rate": round(cached / total, 3) if total else 0.0,
+        "turns": row["turns"],
+    }
 
 
 def tokens_remaining(provider: str) -> int | None:
@@ -321,8 +441,9 @@ def tokens_remaining(provider: str) -> int | None:
     return max(0, limit - tokens_today(provider))
 
 
+@_never_fails(lambda: {"input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0, "turns": 0})
 def conversation_totals(conversation_id: str) -> dict:
-    with _connect() as conn:
+    with _db() as conn:
         row = conn.execute(
             """
             SELECT COALESCE(SUM(input_tokens), 0) AS tin,
@@ -341,8 +462,9 @@ def conversation_totals(conversation_id: str) -> dict:
     }
 
 
+@_never_fails(0.0)
 def spend_since(day: str) -> float:
-    with _connect() as conn:
+    with _db() as conn:
         row = conn.execute(
             "SELECT COALESCE(SUM(cost_usd), 0) AS cost FROM events WHERE quota_day >= ?",
             (day,),
@@ -358,8 +480,9 @@ def spend_this_month() -> float:
     return spend_since(now_pacific().strftime("%Y-%m-01"))
 
 
+@_never_fails(None)
 def mark_exhausted(provider: str, until: datetime, reason: str) -> None:
-    with _write_lock, _connect() as conn:
+    with _write_lock, _db() as conn:
         conn.execute(
             """
             INSERT INTO quota_state (provider, exhausted_until, reason)
@@ -372,14 +495,16 @@ def mark_exhausted(provider: str, until: datetime, reason: str) -> None:
         )
 
 
+@_never_fails(None)
 def clear_exhausted(provider: str) -> None:
-    with _write_lock, _connect() as conn:
+    with _write_lock, _db() as conn:
         conn.execute("DELETE FROM quota_state WHERE provider = ?", (provider,))
 
 
+@_never_fails(None)
 def exhausted_state(provider: str) -> dict | None:
     """Returns the live exhaustion record, or None if the provider is usable."""
-    with _connect() as conn:
+    with _db() as conn:
         row = conn.execute(
             "SELECT * FROM quota_state WHERE provider = ?", (provider,)
         ).fetchone()
@@ -422,6 +547,7 @@ def free_summary() -> dict[str, dict]:
             "tokens_remaining": tokens_remaining(provider),
             "tokens_limit": config.free_tier_tpd(provider),
             "tokens_used": tokens_today(provider),
+            "cache": cache_stats(provider),
             "configured": config.is_configured(provider),
         }
         for provider in config.FREE_TIERS

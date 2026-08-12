@@ -17,10 +17,12 @@ from collections.abc import Iterator
 
 import config
 import ratelimit
+import reference_data
 import usage as usage_ledger
 from llm.anthropic import AnthropicProvider
 from llm.base import (
     Event,
+    anchor_question,
     LLMError,
     ProviderSelected,
     QuotaExceeded,
@@ -172,6 +174,7 @@ def _run(
     free: bool,
     domain: str | None = None,
     dropped_turns: int = 0,
+    sections: tuple[str, ...] | None = None,
 ) -> Iterator[Event]:
     """Stream one provider, recording usage. Raises before the first token only."""
     model = config.get_model(provider)
@@ -181,7 +184,9 @@ def _run(
         emitted = False
         try:
             ratelimit.note_attempt(provider)
-            stream = _PROVIDERS[provider]().get_response_stream(history, domain)
+            stream = _PROVIDERS[provider]().get_response_stream(
+                history, domain, sections
+            )
             for event in stream:
                 if isinstance(event, TextDelta):
                     if not emitted:
@@ -202,6 +207,7 @@ def _run(
                         output_tokens=event.output_tokens,
                         conversation_id=conversation_id,
                         billable=not free,
+                        cached_tokens=event.cached_tokens,
                     )
                     yield event
             return
@@ -231,6 +237,8 @@ def stream_answer(
         raise LLMError("Cannot get a response for an empty conversation.")
 
     full_length = len(history)
+    # Anchor on the untrimmed history: trimming must not change the prefix.
+    sections = reference_data.select_sections(anchor_question(history))
     history = trim_history(history)
     dropped_turns = full_length - len(history)
 
@@ -317,7 +325,7 @@ def stream_answer(
             try:
                 for event in _run(
                     provider, history, conversation_id, free=True, domain=domain,
-                    dropped_turns=dropped_turns,
+                    dropped_turns=dropped_turns, sections=sections,
                 ):
                     if isinstance(event, TextDelta):
                         emitted = True
@@ -371,7 +379,7 @@ def stream_answer(
 
     yield from _run(
         paid_choice, history, conversation_id, free=False, domain=domain,
-        dropped_turns=dropped_turns,
+        dropped_turns=dropped_turns, sections=sections,
     )
 
 

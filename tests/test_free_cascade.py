@@ -33,7 +33,7 @@ def no_real_sleeping(monkeypatch):
 
 def provider_yielding(text, tokens=(100, 50)):
     class P:
-        def get_response_stream(self, history, domain=None):
+        def get_response_stream(self, history, domain=None, sections=None):
             yield TextDelta(text)
             yield Usage("x", "x", *tokens)
 
@@ -42,7 +42,7 @@ def provider_yielding(text, tokens=(100, 50)):
 
 def provider_raising(error):
     class P:
-        def get_response_stream(self, history, domain=None):
+        def get_response_stream(self, history, domain=None, sections=None):
             raise error
             yield  # pragma: no cover
 
@@ -84,7 +84,7 @@ def test_pacing_skips_a_provider_before_it_429s(monkeypatch):
     gemini_called = []
 
     class Gemini:
-        def get_response_stream(self, history, domain=None):
+        def get_response_stream(self, history, domain=None, sections=None):
             gemini_called.append(True)
             yield TextDelta("should not happen")
 
@@ -223,14 +223,14 @@ def test_mid_stream_rate_limit_still_does_not_fail_over(monkeypatch):
     monkeypatch.setenv("GROQ_API_KEY", "gsk-test")
 
     class HalfWay:
-        def get_response_stream(self, history, domain=None):
+        def get_response_stream(self, history, domain=None, sections=None):
             yield TextDelta("half an ")
             raise RateLimited("died mid-answer", 5.0)
 
     groq_called = []
 
     class Groq:
-        def get_response_stream(self, history, domain=None):
+        def get_response_stream(self, history, domain=None, sections=None):
             groq_called.append(True)
             yield TextDelta("rest")
 

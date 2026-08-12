@@ -1617,9 +1617,17 @@
     ]).then(([settings, usage]) => {
       renderProviders(settings);
       const free = Object.entries(usage.free_tiers || {})
-        .map(([id, t]) => (t.tokens_limit
-          ? `${id} ${Math.round(t.tokens_remaining / 1000)}k/${Math.round(t.tokens_limit / 1000)}k tokens`
-          : `${id} ${t.remaining}/${t.limit} req`))
+        .map(([id, t]) => {
+          const budget = t.tokens_limit
+            ? `${id} ${Math.round(t.tokens_remaining / 1000)}k/${Math.round(t.tokens_limit / 1000)}k tokens`
+            : `${id} ${t.remaining}/${t.limit} req`;
+          // Cache hit rate is shown so it can be checked against the
+          // provider's own dashboard rather than taken on trust.
+          const c = t.cache;
+          return c && c.input_tokens
+            ? `${budget} (${Math.round(c.hit_rate * 100)}% cached)`
+            : budget;
+        })
         .join(' · ') || 'no free tier';
       usageSummary.textContent =
         `free left today: ${free} · spent today ${money(usage.today_usd)} · this month ${money(usage.month_usd)}`;

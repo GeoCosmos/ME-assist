@@ -19,7 +19,10 @@ class AnthropicProvider:
     name = "anthropic"
 
     def get_response_stream(
-        self, history: list[dict], domain: str | None = None
+        self,
+        history: list[dict],
+        domain: str | None = None,
+        sections: tuple[str, ...] | None = None,
     ) -> Iterator[Event]:
         model = config.get_model("anthropic")
         messages = [
@@ -29,13 +32,14 @@ class AnthropicProvider:
 
         input_tokens = 0
         output_tokens = 0
+        cached_tokens = 0
 
         try:
             client = Anthropic(api_key=config.get_api_key("anthropic"))
             with client.messages.stream(
                 model=model,
                 max_tokens=8192,
-                system=build_full_system_instruction(domain, history),
+                system=build_full_system_instruction(domain, history, sections),
                 messages=messages,
             ) as stream:
                 for text in stream.text_stream:
@@ -46,9 +50,12 @@ class AnthropicProvider:
                 if usage:
                     input_tokens = getattr(usage, "input_tokens", 0) or 0
                     output_tokens = getattr(usage, "output_tokens", 0) or 0
+                    cached_tokens = (
+                        getattr(usage, "cache_read_input_tokens", 0) or 0
+                    )
         except LLMError:
             raise
         except Exception as exc:
             raise classify_rate_limit(exc, "Anthropic") from exc
 
-        yield Usage("anthropic", model, input_tokens, output_tokens)
+        yield Usage("anthropic", model, input_tokens, output_tokens, cached_tokens)

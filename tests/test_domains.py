@@ -111,3 +111,90 @@ def test_probe_instruction_is_tiny():
     assert len(probe) < 100
     assert len(probe) < len(full) / 100
     assert "6061-T6" not in probe
+
+
+# --- prompt caching depends on a byte-identical prefix -------------------
+
+
+def test_prefix_is_stable_across_a_conversation():
+    """Providers cache on an exact prefix match.
+
+    If the system prompt changes as the conversation develops, the cache never
+    hits -- and on a token-metered free tier a cache hit is worth more than a
+    marginally better choice of reference tables.
+    """
+    from llm.base import build_full_system_instruction as build
+
+    history = [{"role": "user", "content": "What torque for a 1/4-20 into 6061?"}]
+    first = build(None, history)
+
+    history += [
+        {"role": "model", "content": "Use 65-75 in-lb."},
+        {"role": "user", "content": "Now what about thermal cycling in orbit?"},
+    ]
+    second = build(None, history)
+
+    assert first == second, "system prompt changed mid-conversation; cache would miss"
+
+
+def test_sections_come_from_the_first_question_not_the_latest():
+    from llm.base import anchor_question
+
+    history = [
+        {"role": "user", "content": "first question"},
+        {"role": "model", "content": "answer"},
+        {"role": "user", "content": "second question"},
+    ]
+    assert anchor_question(history) == "first question"
+
+
+def test_a_domain_prompt_is_identical_every_turn():
+    from llm.base import build_full_system_instruction as build
+
+    a = build("fasteners", [{"role": "user", "content": "torque?"}])
+    b = build("fasteners", [{"role": "user", "content": "something else entirely"}])
+    assert a == b
+
+
+def test_different_conversations_can_still_differ():
+    """Stability is per conversation, not a single global prompt."""
+    from llm.base import build_full_system_instruction as build
+
+    bolts = build(None, [{"role": "user", "content": "bolt torque preload thread"}])
+    thermal = build(None, [{"role": "user", "content": "radiator emissivity heat flux"}])
+    assert bolts != thermal
+
+
+def test_prefix_survives_history_trimming(monkeypatch):
+    """Trimming must not change the cacheable prefix.
+
+    Sections are anchored on the untrimmed history for exactly this reason: if
+    the first question is dropped by the window, re-deriving sections from
+    what's left would change the prompt and miss the cache from then on.
+    """
+    import llm
+    from llm.base import TextDelta, Usage as UsageEvent
+
+    monkeypatch.setenv("MAX_HISTORY_TURNS", "4")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+
+    seen = []
+
+    class Fake:
+        def get_response_stream(self, history, domain=None, sections=None):
+            seen.append(sections)
+            yield TextDelta("ok")
+            yield UsageEvent("gemini", "gemini-2.5-flash", 10, 5)
+
+    monkeypatch.setitem(llm._PROVIDERS, "gemini", Fake)
+
+    history = [{"role": "user", "content": "bolt torque preload thread question"}]
+    list(llm.stream_answer(list(history), "c1"))
+
+    for i in range(6):
+        history.append({"role": "model", "content": f"a{i}"})
+        history.append({"role": "user", "content": f"follow up {i} about nothing"})
+    list(llm.stream_answer(list(history), "c1"))
+
+    assert seen[0] is not None
+    assert seen[0] == seen[1], "sections changed after trimming; cache would miss"
