@@ -15,13 +15,20 @@ from llm.base import (
 _ROLE_MAP = {"user": "user", "model": "assistant"}
 
 
-class OpenAIProvider:
-    name = "openai"
+class GroqProvider:
+    """Groq exposes an OpenAI-compatible endpoint, so the OpenAI SDK is reused
+    with a different base URL.
+
+    The free tier is metered by TOKENS, not requests: the request allowance is
+    generous but the ~100k tokens/day is what actually runs out, which is why
+    prompt size matters more here than call count."""
+
+    name = "groq"
 
     def get_response_stream(
         self, history: list[dict], domain: str | None = None
     ) -> Iterator[Event]:
-        model = config.get_model("openai")
+        model = config.get_model("groq")
         messages = [{"role": "system", "content": build_full_system_instruction(domain, history)}]
         messages += [
             {"role": _ROLE_MAP[turn["role"]], "content": turn["content"]}
@@ -32,12 +39,14 @@ class OpenAIProvider:
         output_tokens = 0
 
         try:
-            client = OpenAI(api_key=config.get_api_key("openai"))
+            client = OpenAI(
+                api_key=config.get_api_key("groq"),
+                base_url=config.GROQ_BASE_URL,
+            )
             stream = client.chat.completions.create(
                 model=model,
                 messages=messages,
                 stream=True,
-                # Without this, streamed responses report no usage at all.
                 stream_options={"include_usage": True},
             )
             for chunk in stream:
@@ -47,7 +56,6 @@ class OpenAIProvider:
                         yield TextDelta(delta)
                 usage = getattr(chunk, "usage", None)
                 if usage:
-                    # Arrives in a final chunk that carries no choices.
                     input_tokens = getattr(usage, "prompt_tokens", 0) or input_tokens
                     output_tokens = (
                         getattr(usage, "completion_tokens", 0) or output_tokens
@@ -55,6 +63,6 @@ class OpenAIProvider:
         except LLMError:
             raise
         except Exception as exc:
-            raise classify_rate_limit(exc, "OpenAI") from exc
+            raise classify_rate_limit(exc, "Groq") from exc
 
-        yield Usage("openai", model, input_tokens, output_tokens)
+        yield Usage("groq", model, input_tokens, output_tokens)

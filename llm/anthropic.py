@@ -2,27 +2,53 @@ from collections.abc import Iterator
 
 from anthropic import Anthropic
 
-from config import ANTHROPIC_API_KEY, ANTHROPIC_MODEL
-from llm.base import LLMError, build_full_system_instruction
+import config
+from llm.base import (
+    Event,
+    LLMError,
+    TextDelta,
+    Usage,
+    build_full_system_instruction,
+    classify_rate_limit,
+)
 
 _ROLE_MAP = {"user": "user", "model": "assistant"}
 
 
 class AnthropicProvider:
-    def get_response_stream(self, history: list[dict]) -> Iterator[str]:
+    name = "anthropic"
+
+    def get_response_stream(
+        self, history: list[dict], domain: str | None = None
+    ) -> Iterator[Event]:
+        model = config.get_model("anthropic")
         messages = [
             {"role": _ROLE_MAP[turn["role"]], "content": turn["content"]}
             for turn in history
         ]
 
+        input_tokens = 0
+        output_tokens = 0
+
         try:
-            client = Anthropic(api_key=ANTHROPIC_API_KEY)
+            client = Anthropic(api_key=config.get_api_key("anthropic"))
             with client.messages.stream(
-                model=ANTHROPIC_MODEL,
+                model=model,
                 max_tokens=8192,
-                system=build_full_system_instruction(),
+                system=build_full_system_instruction(domain, history),
                 messages=messages,
             ) as stream:
-                yield from stream.text_stream
+                for text in stream.text_stream:
+                    yield TextDelta(text)
+                # Must be read inside the context manager, after the stream drains.
+                final = stream.get_final_message()
+                usage = getattr(final, "usage", None)
+                if usage:
+                    input_tokens = getattr(usage, "input_tokens", 0) or 0
+                    output_tokens = getattr(usage, "output_tokens", 0) or 0
+        except LLMError:
+            raise
         except Exception as exc:
-            raise LLMError(f"Anthropic API call failed: {exc}") from exc
+            raise classify_rate_limit(exc, "Anthropic") from exc
+
+        yield Usage("anthropic", model, input_tokens, output_tokens)
