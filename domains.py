@@ -48,7 +48,10 @@ local yielding at a Kt makes the static case acceptable but the fatigue case not
     "materials": {
         "label": "MATERIALS",
         "blurb": "Alloy and polymer selection, treatments, corrosion",
-        "sections": ("metals", "polymers", "fatigue", "corrosion", "space"),
+        # Trimmed to stay inside a 6,000 token/minute free tier. Fatigue and
+        # spaceflight tables are reachable from the general area when a
+        # materials question actually needs them.
+        "sections": ("metals", "polymers", "corrosion"),
         "starters": [
             "Recommend a material for this part and justify it against alternatives.",
             "Compare two candidate alloys for this application.",
@@ -85,7 +88,7 @@ certification should show.""",
     "thermal": {
         "label": "THERMAL",
         "blurb": "Conduction, radiation, thermal balance and stress",
-        "sections": ("metals", "polymers", "thermal", "space"),
+        "sections": ("metals", "polymers", "thermal"),
         "starters": [
             "Estimate the steady-state temperature of this component.",
             "Size a conduction path or radiator for this heat load.",
@@ -158,7 +161,7 @@ knockdown factors for environment (hot/wet) and damage are normal practice.""",
     "vibrations": {
         "label": "VIBRATIONS",
         "blurb": "Modes, random vibration, shock, launch environments",
-        "sections": ("metals", "stress", "vibration", "space"),
+        "sections": ("metals", "stress", "vibration"),
         "starters": [
             "Estimate the first natural frequency of this structure.",
             "Run a Miles' equation check for this random vibration environment.",
@@ -230,7 +233,13 @@ reaming, or match-drilling at assembly.""",
     "fasteners": {
         "label": "FASTENERS / JOINTS",
         "blurb": "Preload, torque, joint analysis, locking",
-        "sections": ("metals", "fasteners", "stress", "fatigue", "space"),
+        # Trimmed to stay inside a 6,000 token/minute free tier. Bolt fatigue
+        # is covered by the discipline brief itself; the fatigue and space
+        # tables remain reachable from the general area.
+        # The fasteners table already carries joint mechanics, tensile areas
+        # and material strengths, so the general stress tables are redundant
+        # here and this is the one discipline that overran the budget.
+        "sections": ("metals", "fasteners"),
         "starters": [
             "What fastener size, grade, and torque should this joint use?",
             "Check this bolted joint for separation and slip.",
@@ -267,7 +276,7 @@ material, finish, head style, and standard.""",
     "manufacturing": {
         "label": "MANUFACTURING / DFM",
         "blurb": "Process selection, machinability, cost drivers",
-        "sections": ("metals", "polymers", "manufacturing", "fits"),
+        "sections": ("metals", "manufacturing", "fits"),
         "starters": [
             "Review this part for manufacturability.",
             "Which process should make this part at this quantity?",
