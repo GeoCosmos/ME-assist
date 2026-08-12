@@ -1,0 +1,1743 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ME-ASSIST</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<style>
+  :root {
+    --bg: #0A0E12;
+    --panel: #10161C;
+    --grid-line: #1E2830;
+    --grid-line-soft: #182028;
+    --text: #C8D6DC;
+    --text-dim: #5C707A;
+    --text-dimmer: #3D4C56;
+    --accent: #2FD8C4;
+    --warn: #E8A33D;
+    --warn-dim: rgba(232, 163, 61, 0.12);
+    --danger: #FF5C5C;
+    --font-display: 'Space Grotesk', sans-serif;
+    --font-body: 'IBM Plex Sans', sans-serif;
+    --font-mono: 'IBM Plex Mono', monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; overflow-x: hidden; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 15.5px;
+    line-height: 1.6;
+  }
+
+  .console {
+    display: flex;
+    height: 100vh;
+    /* dvh tracks the visible viewport on mobile, where a 100vh column sits
+       partly behind the browser chrome and produces the same symptom. */
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .ops-panel {
+    width: 216px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border-right: 1px solid var(--grid-line);
+    display: flex;
+    flex-direction: column;
+    /* Scroll the section list inside the panel rather than off the screen. */
+    min-height: 0;
+    overflow-y: auto;
+  }
+  .ops-panel__brand { padding: 18px 16px 16px; border-bottom: 1px solid var(--grid-line); }
+  .ops-panel__plate {
+    background: #F4F2EC;
+    border-radius: 3px;
+    padding: 6px 10px 4px;
+    display: inline-flex;
+    line-height: 0;
+  }
+  .ops-panel__plate img { height: 18px; width: auto; display: block; }
+  .ops-panel__section-label {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    color: var(--text-dimmer);
+    padding: 16px 16px 8px;
+  }
+  .launchers { display: flex; flex-direction: column; gap: 2px; padding: 0 8px; }
+  .launcher {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    letter-spacing: 0.04em;
+    text-align: left;
+    padding: 9px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    width: 100%;
+  }
+  .launcher::before {
+    content: '';
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--text-dimmer);
+    flex-shrink: 0;
+  }
+  .launcher:hover, .launcher:focus-visible {
+    background: var(--grid-line-soft);
+    color: var(--text);
+    border-color: var(--grid-line);
+  }
+  .launcher:hover::before, .launcher:focus-visible::before { background: var(--accent); }
+  .launcher:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  .ops-panel__footer {
+    margin-top: auto;
+    padding: 14px 16px 18px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: var(--text-dimmer);
+  }
+
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .status-bar {
+    display: flex;
+    align-items: center;
+    /* Must wrap: the meter carries the cost readout and the API KEYS button,
+       and body has overflow-x hidden, so anything that overflows is simply
+       invisible rather than scrollable. */
+    flex-wrap: wrap;
+    gap: 10px 18px;
+    padding: 11px 20px;
+    border-bottom: 1px solid var(--grid-line);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: var(--text-dim);
+    min-width: 0;
+    flex-shrink: 0;
+  }
+  .status-bar > * { flex-shrink: 0; }
+  .meter { flex-shrink: 0; }
+  #model-label {
+    min-width: 0;
+    flex-shrink: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .status-bar__toggle {
+    display: none;
+    background: none;
+    border: 1px solid var(--grid-line);
+    color: var(--text-dim);
+    border-radius: 3px;
+    width: 28px;
+    height: 28px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .status-bar__name {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 0.01em;
+    color: var(--text);
+    margin-right: auto;
+  }
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-dimmer);
+    display: inline-block;
+    margin-right: 6px;
+  }
+  .status-live .status-dot {
+    background: var(--accent);
+    box-shadow: 0 0 6px var(--accent);
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+  .status-live { color: var(--accent); }
+
+  /* min-height:0 is required. A flex item defaults to min-height:auto, which
+     refuses to shrink below its content -- so the column grows past the
+     viewport, the input bar is pushed off the bottom, and the transcript
+     scrolls underneath it. overflow-y:auto alone does not prevent this. */
+  .log {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 22px 20px 8px;
+  }
+  .log__empty { color: var(--text-dim); font-size: 14.5px; max-width: 46ch; padding-top: 40px; }
+
+  .entry { margin-bottom: 26px; }
+  .entry__meta {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    padding-bottom: 6px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid var(--grid-line);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: var(--text-dim);
+  }
+  .entry--query .entry__label { color: var(--accent); }
+  .entry--error .entry__label { color: var(--danger); }
+  .entry--error { border-left: 2px solid var(--danger); padding-left: 14px; }
+
+  .entry__body p { margin: 0 0 12px; }
+  .entry__body p:last-child { margin-bottom: 0; }
+  .entry__body code {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    background: var(--panel);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+  .entry__body ul { margin: 0 0 12px; padding-left: 20px; }
+  .entry__body .flag {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    background: var(--warn-dim);
+    border-left: 2px solid var(--warn);
+    color: var(--warn);
+    padding: 8px 12px;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    margin: 12px 0;
+    border-radius: 0 3px 3px 0;
+  }
+
+  .cursor {
+    display: inline-block;
+    width: 7px;
+    height: 15px;
+    background: var(--accent);
+    margin-left: 2px;
+    vertical-align: text-bottom;
+    animation: blink 1s step-start infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  .sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .status-live .status-dot, .cursor { animation: none; }
+  }
+
+  .input-bar {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+    padding: 14px 20px;
+    border-top: 1px solid var(--grid-line);
+    background: var(--bg);
+    /* Never shrink and never scroll away: this is the one control that must
+       always be reachable. */
+    flex-shrink: 0;
+  }
+  .input-bar__field {
+    flex: 1;
+    resize: none;
+    max-height: 200px;
+    background: var(--panel);
+    color: var(--text);
+    border: 1px solid var(--grid-line);
+    border-radius: 4px;
+    padding: 10px 12px;
+    font-family: var(--font-body);
+    font-size: 14.5px;
+    line-height: 1.4;
+  }
+  .input-bar__field:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .input-bar__stop { background: var(--warn); border-color: var(--warn); }
+  .input-bar__send {
+    background: var(--accent);
+    color: #04201C;
+    border: none;
+    border-radius: 4px;
+    width: 38px;
+    height: 38px;
+    font-size: 15px;
+    cursor: pointer;
+    flex-shrink: 0;
+    font-weight: 700;
+  }
+  .input-bar__send:hover { filter: brightness(1.1); }
+  .input-bar__send:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+
+  .ops-panel__scrim { display: none; }
+  @media (max-width: 640px) {
+    .status-bar__toggle { display: inline-block; }
+    .ops-panel {
+      position: fixed;
+      inset: 0 25% 0 0;
+      z-index: 20;
+      transform: translateX(-100%);
+      transition: transform 0.2s ease;
+    }
+    .ops-panel.is-open { transform: translateX(0); }
+    .ops-panel__scrim {
+      display: block;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 10;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+    .ops-panel__scrim.is-open { opacity: 1; pointer-events: auto; }
+    .status-bar { padding: 10px 14px; gap: 12px; font-size: 10.5px; }
+    .log { padding: 18px 14px 8px; }
+    .input-bar { padding: 12px 14px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ops-panel { transition: none; }
+    .ops-panel__scrim { transition: none; }
+  }
+
+  /* ---- Billing state: provider badge + running cost ---- */
+  .meter { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+  .badge {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    padding: 3px 7px;
+    border-radius: 3px;
+    border: 1px solid var(--grid-line);
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+  .badge--free { color: var(--accent); border-color: rgba(47, 216, 196, 0.4); }
+  .badge--paid {
+    color: var(--warn);
+    border-color: rgba(232, 163, 61, 0.55);
+    background: var(--warn-dim);
+  }
+  .cost-label { font-family: var(--font-mono); font-size: 11px; color: var(--warn); }
+  .cost-label--zero { color: var(--text-dimmer); }
+  .icon-btn {
+    background: transparent;
+    border: 1px solid var(--grid-line);
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    padding: 4px 9px;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  .icon-btn:hover { color: var(--text); border-color: var(--text-dimmer); }
+
+  /* ---- Switch confirmation (inline, blocking, never auto-dismissed) ---- */
+  .switch-card {
+    border: 1px solid var(--warn);
+    border-left-width: 3px;
+    background: var(--warn-dim);
+    border-radius: 4px;
+    padding: 16px 18px;
+    margin: 14px 0;
+  }
+  .switch-card__title {
+    font-family: var(--font-display);
+    font-size: 14px;
+    color: var(--warn);
+    margin: 0 0 8px;
+    letter-spacing: 0.02em;
+  }
+  .switch-card__body { font-size: 14px; margin: 0 0 10px; }
+  .switch-card__facts {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--text-dim);
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 3px 14px;
+    margin: 0 0 14px;
+  }
+  .switch-card__facts b { color: var(--text); font-weight: 500; }
+  .switch-card__actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    letter-spacing: 0.05em;
+    padding: 8px 14px;
+    border-radius: 3px;
+    cursor: pointer;
+    border: 1px solid var(--grid-line);
+    background: transparent;
+    color: var(--text-dim);
+  }
+  .btn:hover { color: var(--text); border-color: var(--text-dimmer); }
+  .btn--pay { background: var(--warn); border-color: var(--warn); color: #10161C; font-weight: 500; }
+  .btn--pay:hover { color: #10161C; filter: brightness(1.08); }
+  .btn--primary { background: var(--accent); border-color: var(--accent); color: #0A0E12; font-weight: 500; }
+  .btn--primary:hover { color: #0A0E12; filter: brightness(1.08); }
+  .switch-card--resolved { opacity: 0.6; }
+  .switch-card__resolution {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    margin: 0;
+  }
+
+  /* ---- Settings modal ---- */
+  .modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.65);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    padding: 20px;
+  }
+  .modal.is-open { display: flex; }
+  .modal__panel {
+    background: var(--panel);
+    border: 1px solid var(--grid-line);
+    border-radius: 5px;
+    width: min(620px, 100%);
+    max-height: 88vh;
+    overflow-y: auto;
+    padding: 22px 24px 20px;
+  }
+  .modal__title {
+    font-family: var(--font-display);
+    font-size: 16px;
+    margin: 0 0 4px;
+    color: var(--text);
+  }
+  .modal__hint { font-size: 13px; color: var(--text-dim); margin: 0 0 18px; }
+  .prov { border-top: 1px solid var(--grid-line); padding: 14px 0 4px; }
+  .prov__head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .prov__name { font-family: var(--font-display); font-size: 13.5px; }
+  .prov__row { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+  .prov__row label {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--text-dimmer);
+    width: 100%;
+    letter-spacing: 0.08em;
+  }
+  .field {
+    flex: 1;
+    min-width: 180px;
+    background: var(--bg);
+    border: 1px solid var(--grid-line);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 8px 10px;
+    border-radius: 3px;
+  }
+  .field:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+  .prov__first {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    letter-spacing: 0.06em;
+    color: var(--text-dimmer);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .prov__first input { accent-color: var(--accent); margin: 0; cursor: pointer; }
+  .prov__first:has(input:checked) { color: var(--accent); }
+  .prov__status { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); }
+  .prov__status--ok { color: var(--accent); }
+  .prov__status--bad { color: var(--danger); }
+  .modal__footer {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    border-top: 1px solid var(--grid-line);
+    padding-top: 14px;
+    margin-top: 14px;
+  }
+  .modal__usage {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-right: auto;
+    align-self: center;
+  }
+
+  /* ---- Discipline sections ---- */
+  .section { display: flex; flex-direction: column; }
+  .launcher--active {
+    background: var(--grid-line-soft);
+    color: var(--text);
+    border-color: rgba(47, 216, 196, 0.45);
+  }
+  .launcher--active::before { background: var(--accent); }
+  .ops-panel__keys {
+    margin: 14px 8px 0;
+    background: transparent;
+    border: 1px solid var(--grid-line);
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+    padding: 8px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  .ops-panel__keys:hover { color: var(--text); border-color: var(--text-dimmer); }
+  .ops-panel__keys--alert { color: var(--warn); border-color: var(--warn); }
+  .domain-chip {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    border: 1px solid rgba(47, 216, 196, 0.4);
+    border-radius: 3px;
+    padding: 3px 7px;
+    display: none;
+    align-items: center;
+    gap: 6px;
+  }
+  .domain-chip.is-on { display: inline-flex; }
+
+  /* ---- Discipline workspace panel ---- */
+  .domain-panel {
+    display: none;
+    flex-shrink: 0;
+    /* Bounded so a long starter list cannot squeeze the transcript out. */
+    max-height: 38vh;
+    overflow-y: auto;
+    border-bottom: 1px solid var(--grid-line);
+    background: linear-gradient(180deg, rgba(47,216,196,0.05), transparent);
+    padding: 16px 20px 14px;
+  }
+  .domain-panel.is-on { display: block; }
+  .domain-panel__top {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 4px;
+  }
+  .domain-panel__title {
+    font-family: var(--font-display);
+    font-size: 17px;
+    color: var(--accent);
+    margin: 0;
+    letter-spacing: 0.02em;
+  }
+  .domain-panel__exit {
+    margin-left: auto;
+    background: none;
+    border: 1px solid var(--grid-line);
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    padding: 4px 9px;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+  .domain-panel__exit:hover { color: var(--text); border-color: var(--text-dimmer); }
+  .domain-panel__blurb { font-size: 13.5px; color: var(--text-dim); margin: 0 0 12px; }
+  .domain-panel__label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    color: var(--text-dimmer);
+    margin-bottom: 7px;
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 7px; }
+  .chip {
+    background: var(--panel);
+    border: 1px solid var(--grid-line);
+    color: var(--text-dim);
+    font-family: var(--font-body);
+    font-size: 12.5px;
+    text-align: left;
+    padding: 7px 11px;
+    border-radius: 3px;
+    cursor: pointer;
+    line-height: 1.3;
+  }
+  .chip:hover { color: var(--text); border-color: var(--accent); }
+
+  /* Each discipline keeps its own transcript in its own pane, so switching
+     hides a conversation rather than destroying it. */
+  .log__pane { display: none; }
+  .log__pane.is-active { display: block; }
+
+  /* Marks the point where a different model took over the conversation. */
+  .handoff {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 18px 0 14px;
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    letter-spacing: 0.06em;
+    color: var(--warn);
+  }
+  .handoff::before, .handoff::after {
+    content: '';
+    height: 1px;
+    background: rgba(232, 163, 61, 0.3);
+    flex: 1;
+  }
+  .handoff__text { white-space: nowrap; }
+  .handoff__note {
+    font-family: var(--font-body);
+    font-size: 12px;
+    color: var(--text-dim);
+    letter-spacing: 0;
+    text-align: center;
+    margin: -8px 0 14px;
+    padding: 0 8px;
+  }
+  .entry__by {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: 0.06em;
+    color: var(--text-dimmer);
+  }
+  .entry__by--paid { color: var(--warn); }
+  .domain-chip button {
+    background: none;
+    border: none;
+    color: var(--accent);
+    cursor: pointer;
+    font-size: 12px;
+    line-height: 1;
+    padding: 0;
+  }
+</style>
+</head>
+<body>
+  <div class="console">
+    <div class="ops-panel__scrim" id="scrim"></div>
+    <aside class="ops-panel" id="ops-panel">
+      <div class="ops-panel__brand">
+        <span class="ops-panel__plate"><img src="/geocosmos_icon.png" alt="GeoCosmos"></span>
+      </div>
+      <div class="ops-panel__section-label">DISCIPLINE</div>
+      <div class="launchers" id="launchers"></div>
+      <button type="button" class="ops-panel__keys" id="settings-open-side">API KEYS &amp; MODELS</button>
+      <div class="ops-panel__footer">ME-ASSIST&nbsp;/&nbsp;GEOCOSMOS</div>
+    </aside>
+
+    <div class="main">
+      <header class="status-bar">
+        <button type="button" class="status-bar__toggle" id="panel-toggle" aria-label="Toggle quick launch panel">&#9776;</button>
+        <span class="status-bar__name">ME-ASSIST</span>
+        <span id="model-label">MODEL: &mdash;</span>
+        <span id="status-label">IDLE</span>
+        <span id="latency-label"></span>
+        <span class="domain-chip" id="domain-chip">
+          <span id="domain-chip-label"></span>
+          <button type="button" id="domain-clear" aria-label="Clear discipline">&times;</button>
+        </span>
+        <span class="meter">
+          <span class="badge" id="provider-badge">&mdash;</span>
+          <span class="cost-label cost-label--zero" id="cost-label">$0.0000</span>
+          <button type="button" class="icon-btn" id="new-chat" title="Clear this conversation and start fresh">NEW</button>
+          <button type="button" class="icon-btn" id="settings-open">API KEYS</button>
+        </span>
+      </header>
+
+      <section class="domain-panel" id="domain-panel" aria-live="polite"></section>
+
+      <main class="log" id="log" aria-live="polite"></main>
+
+      <form class="input-bar" id="input-form">
+        <textarea id="input" class="input-bar__field" placeholder="Ask a mechanical engineering question&hellip;" rows="1" required></textarea>
+        <button type="button" class="input-bar__send input-bar__stop" id="stop-btn" aria-label="Stop generating" hidden>&#9632;</button>
+        <button type="submit" class="input-bar__send" id="send-btn" aria-label="Send">&#10148;</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal" id="settings-modal">
+    <div class="modal__panel" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <h2 class="modal__title" id="settings-title">API Keys</h2>
+      <p class="modal__hint">
+        Keys are saved to a local <code>.env</code> file next to the app and never leave this machine.
+        Gemini is used first because it has a free tier; the others are only used if you approve a switch.
+      </p>
+      <div id="providers"></div>
+      <div class="modal__footer">
+        <span class="modal__usage" id="usage-summary"></span>
+        <button type="button" class="btn" id="settings-reload" title="Re-read the .env file from disk">RELOAD .ENV</button>
+        <button type="button" class="btn" id="settings-cancel">CANCEL</button>
+        <button type="button" class="btn btn--primary" id="settings-save">SAVE</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const log = document.getElementById('log');
+  const form = document.getElementById('input-form');
+  const input = document.getElementById('input');
+  const statusLabel = document.getElementById('status-label');
+  const latencyLabel = document.getElementById('latency-label');
+  const modelLabel = document.getElementById('model-label');
+  const opsPanel = document.getElementById('ops-panel');
+  const scrim = document.getElementById('scrim');
+  const panelToggle = document.getElementById('panel-toggle');
+  const launchers = document.getElementById('launchers');
+
+  const providerBadge = document.getElementById('provider-badge');
+  const costLabel = document.getElementById('cost-label');
+  const settingsModal = document.getElementById('settings-modal');
+  const providersEl = document.getElementById('providers');
+  const usageSummary = document.getElementById('usage-summary');
+
+  // ---- Workspaces ---------------------------------------------------------
+  // Every discipline (and the general area) is a separate conversation: its own
+  // transcript, its own history sent to the model, its own cost, its own paid
+  // approval. Switching sections hides one and shows another; nothing is lost
+  // and nothing bleeds across. Sending an unrelated transcript into a new
+  // discipline would both confuse the answer and be paid for by the token.
+  const GENERAL = '__general__';
+  const workspaces = new Map();
+  let activeKey = GENERAL;
+
+  function newConversationId() {
+    return (window.crypto && window.crypto.randomUUID)
+      ? window.crypto.randomUUID()
+      : String(Date.now()) + Math.random().toString(16).slice(2);
+  }
+
+  function emptyStateHTML(key) {
+    const label = key === GENERAL
+      ? ''
+      : (domainCatalog.find((d) => d.id === key) || {}).label || '';
+    const lead = label
+      ? `New ${label} conversation.`
+      : 'No entries yet.';
+    const rest = label
+      ? 'Ask your question below, or pick one of the starters above.'
+      : "Ask a mechanical engineering question below — statics, materials, thermal, composites, tolerancing, whatever you've got. Or open a discipline from the left panel.";
+    return `<div class="log__empty"><p><strong>${lead}</strong> ${rest}</p></div>`;
+  }
+
+  function getWorkspace(key) {
+    if (!workspaces.has(key)) {
+      const pane = document.createElement('div');
+      pane.className = 'log__pane';
+      pane.innerHTML = emptyStateHTML(key);
+      log.appendChild(pane);
+      workspaces.set(key, {
+        key,
+        pane,
+        history: [],
+        entryIndex: 0,
+        cost: 0,
+        // Approval is scoped to one conversation and this browser session only.
+        // It is NOT persisted -- a reload must never silently inherit
+        // permission to spend money.
+        approval: null,
+        conversationId: newConversationId(),
+        lastProvider: null,
+        answeredBy: null,
+        answers: {},
+        scrollTop: 0,
+      });
+    }
+    return workspaces.get(key);
+  }
+
+  // ---- Persistence --------------------------------------------------------
+  // Transcripts survive a page refresh. Stored locally in the browser; the
+  // paid-provider approval is deliberately excluded.
+  const STORE_KEY = 'me-assist.workspaces.v1';
+
+  function saveState() {
+    try {
+      const payload = { activeKey, workspaces: {} };
+      for (const [key, ws] of workspaces) {
+        if (!ws.history.length) continue;
+        payload.workspaces[key] = {
+          history: ws.history,
+          entryIndex: ws.entryIndex,
+          cost: ws.cost,
+          conversationId: ws.conversationId,
+          answers: ws.answers,
+        };
+      }
+      localStorage.setItem(STORE_KEY, JSON.stringify(payload));
+    } catch (err) {
+      /* private mode or quota exceeded -- persistence is a convenience */
+    }
+  }
+
+  function replay(ws) {
+    ws.pane.innerHTML = '';
+    let index = 0;
+    let previous = null;
+    for (const turn of ws.history) {
+      if (turn.role === 'user') {
+        index += 1;
+        appendEntryTo(ws, 'query', index, 'QUERY', formatBody(turn.content));
+        continue;
+      }
+      const provider = ws.answers[index];
+      if (provider && previous && previous.provider !== provider.provider) {
+        insertHandoff(ws, null, previous, provider);
+      }
+      const article = appendEntryTo(ws, 'response', index, 'RESPONSE', formatBody(turn.content));
+      renderMath(article.querySelector('.entry__body'));
+      if (provider) {
+        const by = document.createElement('span');
+        by.className = 'entry__by' + (provider.free ? '' : ' entry__by--paid');
+        by.textContent = provider.name.toUpperCase() + (provider.free ? '' : ' · PAID');
+        article.querySelector('.entry__meta').appendChild(by);
+        previous = provider;
+      }
+    }
+    ws.answeredBy = previous;
+    ws.lastProvider = previous;
+  }
+
+  function restoreState() {
+    let payload;
+    try {
+      payload = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+    } catch (err) {
+      return null;
+    }
+    if (!payload || !payload.workspaces) return null;
+
+    for (const [key, saved] of Object.entries(payload.workspaces)) {
+      const ws = getWorkspace(key);
+      ws.history = saved.history || [];
+      ws.entryIndex = saved.entryIndex || 0;
+      ws.cost = saved.cost || 0;
+      ws.conversationId = saved.conversationId || ws.conversationId;
+      ws.answers = saved.answers || {};
+      if (ws.history.length) replay(ws);
+    }
+    return payload.activeKey || null;
+  }
+
+  function resetWorkspace(ws) {
+    ws.history = [];
+    ws.entryIndex = 0;
+    ws.cost = 0;
+    ws.approval = null;
+    ws.answers = {};
+    ws.answeredBy = null;
+    ws.lastProvider = null;
+    ws.conversationId = newConversationId();
+    ws.pane.innerHTML = emptyStateHTML(ws.key);
+    setConversationCost(0);
+    lastProviderInfo = null;
+    saveState();
+    refreshStatus();
+  }
+
+  function current() {
+    return getWorkspace(activeKey);
+  }
+
+  function showWorkspace(key) {
+    const outgoing = workspaces.get(activeKey);
+    if (outgoing) outgoing.scrollTop = log.scrollTop;
+
+    activeKey = key;
+    saveState();
+    const ws = getWorkspace(key);
+    for (const other of workspaces.values()) {
+      other.pane.classList.toggle('is-active', other === ws);
+    }
+
+    lastProviderInfo = ws.lastProvider;
+    setConversationCost(ws.cost);
+    if (ws.lastProvider) setProviderBadge(ws.lastProvider); else refreshStatus();
+    log.scrollTop = ws.scrollTop;
+    latencyLabel.textContent = '';
+  }
+
+  function money(value) {
+    return '$' + value.toFixed(4);
+  }
+
+  let lastProviderInfo = null;
+
+  function setProviderBadge(info) {
+    lastProviderInfo = info;
+    if (!info) {
+      providerBadge.textContent = '—';
+      providerBadge.className = 'badge';
+      return;
+    }
+    const label = info.free ? `${info.name} · FREE` : `${info.name} · PAID`;
+    providerBadge.textContent = label;
+    providerBadge.className = 'badge ' + (info.free ? 'badge--free' : 'badge--paid');
+    providerBadge.title = info.model;
+  }
+
+  function setConversationCost(value) {
+    costLabel.textContent = money(value);
+    costLabel.classList.toggle('cost-label--zero', value <= 0);
+  }
+
+  function refreshStatus() {
+    return fetch('/model-info')
+      .then((res) => res.json())
+      .then((data) => {
+        modelLabel.textContent = `MODEL: ${data.model}`;
+        const anyKey = Object.values(data.configured || {}).some(Boolean);
+        const sideBtn = document.getElementById('settings-open-side');
+        sideBtn.classList.toggle('ops-panel__keys--alert', !anyKey);
+        if (!anyKey) {
+          providerBadge.textContent = 'NO API KEY';
+          providerBadge.className = 'badge badge--paid';
+          // Say it on every empty pane, not just whichever one loaded first.
+          for (const ws of workspaces.values()) {
+            const empty = ws.pane.querySelector('.log__empty');
+            if (empty) {
+              empty.innerHTML =
+                '<p><strong>No API key set yet.</strong> Click <em>API KEYS</em> (top right, or in the left panel) '
+                + 'and paste a Gemini or Groq key — both have free tiers. Press TEST to check it, then SAVE.</p>';
+            }
+          }
+          return data;
+        }
+        // Once this conversation is on a paid provider, the badge stays on the
+        // paid state -- the user should not be able to forget they are billing.
+        if (lastProviderInfo && !lastProviderInfo.free) {
+          setProviderBadge(lastProviderInfo);
+          return data;
+        }
+        if (data.free_remaining !== null && data.free_remaining !== undefined) {
+          const label = data.name ? `${data.name.toUpperCase()} · FREE` : 'FREE';
+          // Show whichever budget is actually running out. On a token-metered
+          // tier the request count is meaningless -- tokens run out first.
+          let counter = `${data.free_remaining}/${data.free_limit} req`;
+          let low = data.free_remaining <= 0;
+          if (data.tokens_limit) {
+            const left = data.tokens_remaining;
+            const k = (n) => (n >= 1000 ? (n / 1000).toFixed(n >= 10000 ? 0 : 1) + 'k' : String(n));
+            counter = `${k(left)}/${k(data.tokens_limit)} tokens`;
+            low = left <= 0;
+            // Roughly how many more questions that buys, at ~3.5k a turn.
+            const prompts = Math.floor(left / 3500);
+            providerBadge.title =
+              `${data.model} — about ${prompts} more question${prompts === 1 ? '' : 's'} today`;
+          } else {
+            providerBadge.title = data.model || '';
+          }
+          providerBadge.textContent = `${label} ${counter}`;
+          providerBadge.className = 'badge ' + (low ? 'badge--paid' : 'badge--free');
+        } else {
+          providerBadge.textContent = `${(data.name || '').toUpperCase()} · PAID`;
+          providerBadge.className = 'badge badge--paid';
+        }
+        return data;
+      })
+      .catch(() => { modelLabel.textContent = 'MODEL: unknown'; });
+  }
+
+  refreshStatus();
+
+  function pad(n) {
+    return String(n).padStart(3, '0');
+  }
+
+  // Inline formatting is applied per line, and only outside code fences.
+  // Doing it up-front over the whole text let the inline-code pattern
+  // `...` swallow the ``` fence markers themselves.
+  function inlineFormat(line) {
+    return line
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/`([^`]+)`/g, '<code>$1</code>');
+  }
+
+  function formatBody(text) {
+    const escaped = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+    const lines = escaped.split('\n');
+    const htmlParts = [];
+    let listBuffer = [];
+    let listTag = null;
+    let inCodeFence = false;
+    let codeBuffer = [];
+
+    // A blank line between list items must NOT end the list. Models routinely
+    // write "1. foo\n\n2. bar", and closing the <ol> on the blank line starts a
+    // new list that restarts numbering at 1 -- which is why every numbered list
+    // used to render as "1. ... 1. ... 1. ...".
+    let pendingBlank = false;
+    let listStart = 1;
+
+    const flushList = () => {
+      if (listBuffer.length) {
+        const openTag = listTag === 'ol' && listStart !== 1
+          ? `<ol start="${listStart}">`
+          : `<${listTag}>`;
+        htmlParts.push(`${openTag}${listBuffer.map((li) => `<li>${li}</li>`).join('')}</${listTag}>`);
+        listBuffer = [];
+        listTag = null;
+        listStart = 1;
+      }
+      pendingBlank = false;
+    };
+
+    for (const rawLine of lines) {
+      const trimmed = rawLine.trim();
+
+      // Allow a language tag, e.g. ```python -- models emit those constantly.
+      if (/^```/.test(trimmed)) {
+        if (inCodeFence) {
+          htmlParts.push(`<pre><code>${codeBuffer.join('\n')}</code></pre>`);
+          codeBuffer = [];
+          inCodeFence = false;
+        } else {
+          flushList();
+          inCodeFence = true;
+        }
+        continue;
+      }
+      if (inCodeFence) {
+        codeBuffer.push(rawLine);
+        continue;
+      }
+
+      if (!trimmed) {
+        // Defer the decision: if the next real line continues the list, the
+        // blank was just spacing between items.
+        if (listBuffer.length) pendingBlank = true;
+        else flushList();
+        continue;
+      }
+      if (trimmed.startsWith('VERIFY:')) {
+        flushList();
+        htmlParts.push(
+          `<div class="flag"><span aria-hidden="true">&#9888;</span>${inlineFormat(trimmed.slice(7).trim())}</div>`
+        );
+      } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+        if (listTag && listTag !== 'ul') flushList();
+        listTag = 'ul';
+        pendingBlank = false;
+        listBuffer.push(inlineFormat(trimmed.slice(2)));
+      } else if (/^\d+[.)]\s/.test(trimmed)) {
+        if (listTag && listTag !== 'ol') flushList();
+        // Respect a list that deliberately starts at something other than 1.
+        if (!listBuffer.length) listStart = parseInt(trimmed, 10) || 1;
+        listTag = 'ol';
+        pendingBlank = false;
+        listBuffer.push(inlineFormat(trimmed.replace(/^\d+[.)]\s/, '')));
+      } else if (listBuffer.length && !pendingBlank && /^\s{2,}/.test(rawLine)) {
+        // Indented continuation of the current item, e.g. a wrapped sentence.
+        listBuffer[listBuffer.length - 1] += ' ' + inlineFormat(trimmed);
+      } else {
+        flushList();
+        htmlParts.push(`<p>${inlineFormat(trimmed)}</p>`);
+      }
+    }
+    flushList();
+    if (inCodeFence && codeBuffer.length) {
+      htmlParts.push(`<pre><code>${codeBuffer.join('\n')}</code></pre>`);
+    }
+    return htmlParts.join('');
+  }
+
+  function renderMath(container) {
+    if (window.renderMathInElement) {
+      window.renderMathInElement(container, {
+        delimiters: [
+          { left: '$$', right: '$$', display: true },
+          { left: '$', right: '$', display: false },
+        ],
+        throwOnError: false,
+      });
+    }
+  }
+
+  function appendEntryTo(ws, role, index, label, bodyHTML) {
+    const empty = ws.pane.querySelector('.log__empty');
+    if (empty) empty.remove();
+    const article = document.createElement('article');
+    article.className = `entry entry--${role}`;
+    article.innerHTML = `
+      <div class="entry__meta">
+        <span class="entry__index">${pad(index)}</span>
+        <span class="entry__label">${label}</span>
+      </div>
+      <div class="entry__body">${bodyHTML}</div>
+    `;
+    ws.pane.appendChild(article);
+    if (ws.key === activeKey) log.scrollTop = log.scrollHeight;
+    return article;
+  }
+
+  function appendEntry(role, index, label, bodyHTML) {
+    return appendEntryTo(current(), role, index, label, bodyHTML);
+  }
+
+  function setStatus(state) {
+    const live = state === 'transmitting';
+    if (live) {
+      statusLabel.innerHTML = '<span class="status-dot"></span>TRANSMITTING';
+      statusLabel.classList.add('status-live');
+    } else {
+      statusLabel.textContent = 'IDLE';
+      statusLabel.classList.remove('status-live');
+    }
+    const stop = document.getElementById('stop-btn');
+    const send = document.getElementById('send-btn');
+    if (stop && send) {
+      stop.hidden = !live;
+      send.hidden = live;
+    }
+  }
+
+  function parseSseBuffer(buffer, onEvent) {
+    let sepIndex;
+    while ((sepIndex = buffer.indexOf('\n\n')) !== -1) {
+      const rawEvent = buffer.slice(0, sepIndex);
+      buffer = buffer.slice(sepIndex + 2);
+      if (rawEvent.startsWith('data: ')) {
+        onEvent(JSON.parse(rawEvent.slice(6)));
+      }
+    }
+    return buffer;
+  }
+
+  // Lets a running answer be stopped. On a metered free tier an unwanted
+  // 800-token answer is real budget, so this is not just a nicety.
+  let inFlight = null;
+
+  async function streamChat(ws, onDelta, approvedProvider) {
+    inFlight = new AbortController();
+    const res = await fetch('/chat', {
+      method: 'POST',
+      signal: inFlight.signal,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        history: ws.history,
+        conversation_id: ws.conversationId,
+        approved_provider: approvedProvider || null,
+        domain: ws.key === GENERAL ? null : ws.key,
+      }),
+    });
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let fullText = '';
+    let sawDone = false;
+    let sawError = null;
+    let switchRequired = null;
+    let turnProvider = null;
+    let droppedTurns = 0;
+
+    try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      buffer = parseSseBuffer(buffer, (payload) => {
+        if (payload.delta) {
+          fullText += payload.delta;
+          onDelta(fullText);
+        }
+        if (payload.provider) {
+          ws.lastProvider = payload.provider;
+          turnProvider = payload.provider;
+          droppedTurns = payload.provider.dropped_turns || 0;
+          if (ws.key === activeKey) {
+            setProviderBadge(payload.provider);
+            setStatus('transmitting');
+          }
+        }
+        if (payload.waiting && ws.key === activeKey) {
+          // Say why we are pausing rather than looking hung.
+          statusLabel.innerHTML =
+            `<span class="status-dot"></span>${payload.waiting.name.toUpperCase()} RATE LIMIT · WAITING ${payload.waiting.seconds}s`;
+          statusLabel.classList.add('status-live');
+        }
+        if (payload.usage && payload.usage.conversation) {
+          ws.cost = payload.usage.conversation.cost_usd;
+          if (ws.key === activeKey) setConversationCost(ws.cost);
+        }
+        if (payload.switch_required) {
+          switchRequired = payload.switch_required;
+        }
+        if (payload.done) {
+          sawDone = true;
+        }
+        if (payload.error) {
+          sawError = payload.error;
+        }
+      });
+    }
+    } catch (err) {
+      if (err && err.name === 'AbortError') {
+        return { ok: true, text: fullText, provider: turnProvider,
+                 droppedTurns, stopped: true };
+      }
+      throw err;
+    } finally {
+      inFlight = null;
+    }
+
+    if (switchRequired) {
+      return { ok: false, switchRequired };
+    }
+    if (sawError) {
+      return { ok: false, error: sawError };
+    }
+    if (!sawDone) {
+      return { ok: false, error: 'Response was interrupted. Please try again.' };
+    }
+    return { ok: true, text: fullText, provider: turnProvider, droppedTurns };
+  }
+
+  function insertHandoff(ws, before, from, to) {
+    // `before === null` appends, which is what replaying a saved transcript needs.
+    // A different model is answering. It receives the transcript as plain text
+    // and has none of the previous model's reasoning, so say so explicitly
+    // rather than letting the conversation appear seamless.
+    const el = document.createElement('div');
+    el.innerHTML = `
+      <div class="handoff"><span class="handoff__text">
+        MODEL CHANGED &nbsp;·&nbsp; ${from.name.toUpperCase()} &rarr; ${to.name.toUpperCase()}
+      </span></div>
+      <p class="handoff__note">
+        Answers below come from <strong>${to.name}</strong> (${to.model}).
+        It was given the conversation above as text, but none of ${from.name}'s
+        working — expect a change in style, and re-state any assumptions that matter.
+      </p>
+    `;
+    while (el.firstElementChild) {
+      ws.pane.insertBefore(el.firstElementChild, before);
+    }
+  }
+
+  function formatReset(iso) {
+    if (!iso) return 'later today';
+    try {
+      const when = new Date(iso);
+      return when.toLocaleString(undefined, {
+        weekday: 'short', hour: 'numeric', minute: '2-digit',
+      });
+    } catch (err) {
+      return 'later today';
+    }
+  }
+
+  function renderSwitchCard(ws, info, index) {
+    const article = document.createElement('article');
+    article.className = 'entry entry--response';
+    const REASONS = {
+      free_tier_daily_limit: `${info.from_name || 'The free provider'}'s free daily quota is used up.`,
+      free_tier_rate_limited: `${info.from_name || 'The free provider'} is rate limited right now and hasn't cleared. Your daily free quota is still fine — waiting a minute and resending costs nothing.`,
+      no_free_tier_available: 'No provider with a free tier is configured.',
+    };
+    const reason = REASONS[info.reason] || REASONS.no_free_tier_available;
+    const waitIsBetter = info.reason === 'free_tier_rate_limited';
+
+    article.innerHTML = `
+      <div class="entry__meta">
+        <span class="entry__index">${pad(index)}</span>
+        <span class="entry__label">APPROVAL REQUIRED</span>
+      </div>
+      <div class="entry__body">
+        <div class="switch-card">
+          <p class="switch-card__title">This answer would cost money</p>
+          <p class="switch-card__body">
+            ${reason} Continuing will send this conversation to
+            <strong>${info.to_name}</strong> (${info.to_model}), which is billed per token.
+            Nothing has been sent yet.
+          </p>
+          <div class="switch-card__facts">
+            <span>Estimated cost, this answer</span><b>${money(info.est_cost_usd)}</b>
+            <span>Spent so far, this conversation</span><b>${money(info.conversation_cost_usd)}</b>
+            <span>Estimated tokens</span><b>${info.est_input_tokens.toLocaleString()} in / ${info.est_output_tokens.toLocaleString()} out</b>
+            <span>Free quota returns</span><b>${formatReset(info.resets_at)}</b>
+          </div>
+          <div class="switch-card__actions">
+            ${waitIsBetter
+              ? '<button type="button" class="btn btn--primary" data-scope="retry">RETRY ON FREE</button>'
+              : ''}
+            <button type="button" class="btn ${waitIsBetter ? '' : 'btn--pay'}" data-scope="once">USE ${info.to_name.toUpperCase()} — THIS ANSWER</button>
+            <button type="button" class="btn" data-scope="conversation">— REST OF THIS CONVERSATION</button>
+            <button type="button" class="btn" data-scope="cancel">CANCEL</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const empty = ws.pane.querySelector('.log__empty');
+    if (empty) empty.remove();
+    ws.pane.appendChild(article);
+    log.scrollTop = log.scrollHeight;
+
+    const card = article.querySelector('.switch-card');
+    card.addEventListener('click', async (e) => {
+      const btn = e.target.closest('button[data-scope]');
+      if (!btn) return;
+      const scope = btn.dataset.scope;
+
+      if (scope === 'retry') {
+        card.classList.add('switch-card--resolved');
+        card.innerHTML = '<p class="switch-card__resolution">Retrying on the free tier…</p>';
+        await runTurn(ws, index, null);
+        return;
+      }
+
+      if (scope === 'cancel') {
+        // Roll back the unanswered question so history stays consistent.
+        ws.history.pop();
+        card.classList.add('switch-card--resolved');
+        card.innerHTML = '<p class="switch-card__resolution">Cancelled — nothing was sent, nothing was billed.</p>';
+        return;
+      }
+
+      if (scope === 'conversation') {
+        ws.approval = info.to_provider;
+      }
+      card.classList.add('switch-card--resolved');
+      card.innerHTML = `<p class="switch-card__resolution">Approved — ${info.to_name} (${info.to_model})${scope === 'conversation' ? ', for the rest of this conversation' : ', this answer only'}.</p>`;
+      await runTurn(ws, index, info.to_provider);
+    });
+  }
+
+  async function runTurn(ws, index, approvedProvider) {
+    if (ws.key === activeKey) setStatus('transmitting');
+    const startedAt = performance.now();
+    const responseArticle = appendEntryTo(ws, 'response', index, 'RESPONSE', '<p><span class="cursor"></span></p>');
+    const responseBody = responseArticle.querySelector('.entry__body');
+
+    const result = await streamChat(ws, (partialText) => {
+      responseBody.innerHTML = formatBody(partialText) + '<span class="cursor"></span>';
+      if (ws.key === activeKey) log.scrollTop = log.scrollHeight;
+    }, approvedProvider);
+
+    if (ws.key === activeKey) setStatus('idle');
+
+    if (result.switchRequired) {
+      responseArticle.remove();
+      renderSwitchCard(ws, result.switchRequired, index);
+      return;
+    }
+
+    if (!result.ok) {
+      responseArticle.remove();
+      appendEntryTo(ws, 'error', index, 'ERROR', formatBody(result.error));
+      refreshStatus();
+      return;
+    }
+
+    if (result.droppedTurns) {
+      // The model did not see the start of this conversation. Saying so beats
+      // an answer that quietly ignores a constraint stated ten turns ago.
+      const note = document.createElement('p');
+      note.className = 'handoff__note';
+      note.innerHTML =
+        `<strong>Context trimmed:</strong> the earliest ${result.droppedTurns} `
+        + `message${result.droppedTurns === 1 ? '' : 's'} of this conversation `
+        + `were not sent, to stay inside the daily token budget. Re-state anything `
+        + `from the start that still matters, or press NEW for a clean thread.`;
+      ws.pane.insertBefore(note, responseArticle);
+    }
+
+    if (result.provider) {
+      const previous = ws.answeredBy;
+      if (previous && previous.provider !== result.provider.provider) {
+        insertHandoff(ws, responseArticle, previous, result.provider);
+      }
+      ws.answeredBy = result.provider;
+      ws.answers[index] = result.provider;
+      // Attribute every answer inline, so scrollback stays honest about which
+      // model produced which reasoning.
+      const meta = responseArticle.querySelector('.entry__meta');
+      const by = document.createElement('span');
+      by.className = 'entry__by' + (result.provider.free ? '' : ' entry__by--paid');
+      by.textContent = result.provider.name.toUpperCase()
+        + (result.provider.free ? '' : ' · PAID');
+      meta.appendChild(by);
+    }
+
+    responseBody.innerHTML = formatBody(result.text)
+      + (result.stopped ? '<p class="handoff__note">Stopped.</p>' : '');
+    renderMath(responseBody);
+    if (!result.text.trim()) {
+      responseArticle.remove();
+      ws.history.pop();          // nothing came back; do not poison the context
+      saveState();
+      return;
+    }
+    ws.history.push({ role: 'model', content: result.text });
+    saveState();
+    if (ws.key === activeKey) {
+      const elapsedSeconds = ((performance.now() - startedAt) / 1000).toFixed(1);
+      latencyLabel.textContent = `LAT: ${elapsedSeconds}s`;
+    }
+    refreshStatus();
+  }
+
+  function openPanel() {
+    opsPanel.classList.add('is-open');
+    scrim.classList.add('is-open');
+  }
+  function closePanel() {
+    opsPanel.classList.remove('is-open');
+    scrim.classList.remove('is-open');
+  }
+  panelToggle.addEventListener('click', () => {
+    opsPanel.classList.contains('is-open') ? closePanel() : openPanel();
+  });
+  scrim.addEventListener('click', closePanel);
+
+  // ---- Discipline sections ------------------------------------------------
+  // Selecting a section is a working mode, not a canned question: it narrows
+  // the system prompt and the reference tables for every following message.
+  let activeDomain = null;
+  let domainCatalog = [];
+
+  const domainChip = document.getElementById('domain-chip');
+  const domainChipLabel = document.getElementById('domain-chip-label');
+  const domainPanel = document.getElementById('domain-panel');
+
+  function renderDomains() {
+    // The sidebar is just the selector. Everything about the selected
+    // discipline lives in its own panel above the log.
+    launchers.innerHTML = domainCatalog.map((d) => `
+      <div class="section" data-domain="${d.id}">
+        <button type="button" class="launcher ${activeDomain === d.id ? 'launcher--active' : ''}"
+                aria-pressed="${activeDomain === d.id}">${d.label}</button>
+      </div>
+    `).join('');
+
+    const active = domainCatalog.find((d) => d.id === activeDomain);
+    domainChip.classList.toggle('is-on', Boolean(active));
+    if (active) domainChipLabel.textContent = active.label;
+
+    domainPanel.classList.toggle('is-on', Boolean(active));
+    if (active) {
+      domainPanel.innerHTML = `
+        <div class="domain-panel__top">
+          <h2 class="domain-panel__title">${active.label}</h2>
+          <button type="button" class="domain-panel__exit" data-role="exit">EXIT SECTION</button>
+        </div>
+        <p class="domain-panel__blurb">
+          ${active.blurb}. Answers in this section are focused on ${active.label.toLowerCase()} —
+          the assistant uses a ${active.label.toLowerCase()} brief and only the reference tables
+          for this discipline.
+        </p>
+        <div class="domain-panel__label">START WITH</div>
+        <div class="chips">
+          ${active.starters.map((s) => `<button type="button" class="chip">${s}</button>`).join('')}
+        </div>
+      `;
+    } else {
+      domainPanel.innerHTML = '';
+    }
+  }
+
+  function setDomain(id) {
+    activeDomain = activeDomain === id ? null : id;
+    renderDomains();
+    showWorkspace(activeDomain || GENERAL);
+  }
+
+  fetch('/domains')
+    .then((r) => r.json())
+    .then((data) => {
+      domainCatalog = data.domains;
+      renderDomains();
+      // Refresh the general pane's placeholder now that labels are known.
+      const general = workspaces.get(GENERAL);
+      if (general && general.pane.querySelector('.log__empty')) {
+        general.pane.innerHTML = emptyStateHTML(GENERAL);
+      }
+    })
+    .catch(() => {});
+
+  // Restore saved transcripts, then open whichever workspace was last active.
+  const restoredKey = restoreState();
+  if (restoredKey && restoredKey !== GENERAL) {
+    activeDomain = restoredKey;
+    renderDomains();
+  }
+  showWorkspace(restoredKey || GENERAL);
+
+  document.getElementById('stop-btn').addEventListener('click', () => {
+    if (inFlight) inFlight.abort();
+  });
+
+  document.getElementById('new-chat').addEventListener('click', () => {
+    const ws = current();
+    if (ws.history.length && !window.confirm(
+      'Clear this conversation? A fresh conversation also costs fewer tokens, '
+      + 'since the whole history is re-sent on every question.'
+    )) return;
+    resetWorkspace(ws);
+  });
+
+  launchers.addEventListener('click', (e) => {
+    const btn = e.target.closest('.launcher');
+    if (!btn) return;
+    setDomain(btn.closest('.section').dataset.domain);
+    closePanel();
+  });
+
+  domainPanel.addEventListener('click', (e) => {
+    if (e.target.closest('[data-role="exit"]')) {
+      activeDomain = null;
+      renderDomains();
+      showWorkspace(GENERAL);
+      return;
+    }
+    const chip = e.target.closest('.chip');
+    if (!chip) return;
+    input.value = chip.textContent.trim();
+    input.dispatchEvent(new Event('input'));
+    input.focus();
+  });
+
+  document.getElementById('domain-clear').addEventListener('click', () => {
+    activeDomain = null;
+    renderDomains();
+    showWorkspace(GENERAL);
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const text = input.value.trim();
+    if (!text) return;
+
+    const ws = current();
+    ws.entryIndex += 1;
+    const index = ws.entryIndex;
+    appendEntryTo(ws, 'query', index, 'QUERY', formatBody(text));
+    ws.history.push({ role: 'user', content: text });
+    input.value = '';
+    input.style.height = 'auto';
+
+    await runTurn(ws, index, ws.approval);
+  });
+
+  // ---- Settings ----------------------------------------------------------
+  let providerOrder = [];
+
+  function renderProviders(data) {
+    providerOrder = data.chain.slice();
+    providersEl.innerHTML = data.providers.map((p) => `
+      <div class="prov" data-provider="${p.id}">
+        <div class="prov__head">
+          <label class="prov__first" title="Answer with this provider first">
+            <input type="radio" name="primary" value="${p.id}"
+                   ${data.chain[0] === p.id ? 'checked' : ''}
+                   ${p.configured ? '' : 'disabled'}>
+            <span>${data.chain[0] === p.id ? 'USED FIRST' : 'USE FIRST'}</span>
+          </label>
+          <span class="prov__name">${p.name}</span>
+          <span class="prov__status ${p.configured ? 'prov__status--ok' : ''}" data-role="status">
+            ${p.configured ? 'KEY SET' : 'NO KEY'}
+          </span>
+          ${p.has_free_tier
+            ? `<span class="badge badge--free">FREE ${p.free_remaining}/${p.free_limit}</span>`
+            : '<span class="badge badge--paid">PAID</span>'}
+        </div>
+        <div class="prov__row">
+          <label>API KEY</label>
+          <input class="field" data-role="key" type="password" autocomplete="off"
+                 placeholder="${p.configured ? p.masked_key : 'paste key here'}" value="">
+        </div>
+        <div class="prov__row">
+          <label>MODEL &mdash; changing this also changes the free limits below</label>
+          <input class="field" data-role="model" value="${p.model}"
+                 placeholder="${p.default_model}" list="models-${p.id}">
+          <datalist id="models-${p.id}">
+            ${(p.known_models || []).map((m) => `<option value="${m}">`).join('')}
+          </datalist>
+          <button type="button" class="btn" data-role="test">TEST</button>
+        </div>
+        ${p.has_free_tier ? `
+        <div class="prov__row">
+          <label>FREE LIMITS &mdash; correct these from your provider console; the published
+                 numbers vary by account and model</label>
+          <input class="field" data-role="rpd" value="${p.limits.rpd}" placeholder="req/day">
+          <input class="field" data-role="rpm" value="${p.limits.rpm}" placeholder="req/min">
+          <input class="field" data-role="tpm" value="${p.limits.tpm}" placeholder="tokens/min">
+          <input class="field" data-role="tpd" value="${p.limits.tpd}" placeholder="tokens/day">
+        </div>` : ''}
+      </div>
+    `).join('');
+  }
+
+  function openSettings() {
+    Promise.all([
+      fetch('/settings').then((r) => r.json()),
+      fetch(`/usage?conversation_id=${encodeURIComponent(current().conversationId)}`).then((r) => r.json()),
+    ]).then(([settings, usage]) => {
+      renderProviders(settings);
+      const free = Object.entries(usage.free_tiers || {})
+        .map(([id, t]) => (t.tokens_limit
+          ? `${id} ${Math.round(t.tokens_remaining / 1000)}k/${Math.round(t.tokens_limit / 1000)}k tokens`
+          : `${id} ${t.remaining}/${t.limit} req`))
+        .join(' · ') || 'no free tier';
+      usageSummary.textContent =
+        `free left today: ${free} · spent today ${money(usage.today_usd)} · this month ${money(usage.month_usd)}`;
+      settingsModal.classList.add('is-open');
+    });
+  }
+
+  function closeSettings() {
+    settingsModal.classList.remove('is-open');
+  }
+
+  document.getElementById('settings-open').addEventListener('click', openSettings);
+  document.getElementById('settings-open-side').addEventListener('click', () => {
+    closePanel();
+    openSettings();
+  });
+  document.getElementById('settings-cancel').addEventListener('click', closeSettings);
+  settingsModal.addEventListener('click', (e) => {
+    if (e.target === settingsModal) closeSettings();
+  });
+
+  function collectSettings() {
+    const keys = {};
+    const models = {};
+    const limits = {};
+    // Reorder the chain so the chosen provider is tried first. Without this,
+    // configuring a provider does nothing visible while an earlier one in the
+    // chain still has free capacity.
+    const picked = providersEl.querySelector('input[name="primary"]:checked');
+    const chain = picked
+      ? [picked.value, ...providerOrder.filter((p) => p !== picked.value)]
+      : null;
+    providersEl.querySelectorAll('.prov').forEach((row) => {
+      const id = row.dataset.provider;
+      const keyValue = row.querySelector('[data-role="key"]').value.trim();
+      // An empty box means "leave the stored key alone", not "delete it".
+      if (keyValue) keys[id] = keyValue;
+      models[id] = row.querySelector('[data-role="model"]').value.trim();
+
+      const entry = {};
+      for (const kind of ['rpd', 'rpm', 'tpm', 'tpd']) {
+        const field = row.querySelector(`[data-role="${kind}"]`);
+        if (field && field.value.trim()) entry[kind] = field.value.trim();
+      }
+      if (Object.keys(entry).length) limits[id] = entry;
+    });
+    return { keys, models, limits, chain };
+  }
+
+  providersEl.addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-role="test"]');
+    if (!btn) return;
+    const row = btn.closest('.prov');
+    const id = row.dataset.provider;
+    const statusEl = row.querySelector('[data-role="status"]');
+    const typed = row.querySelector('[data-role="key"]').value.trim();
+    const model = row.querySelector('[data-role="model"]').value.trim();
+
+    statusEl.textContent = 'TESTING…';
+    statusEl.className = 'prov__status';
+
+    // Save key and model first, so the test exercises exactly what is typed --
+    // this is how a bad model id gets caught instead of failing later.
+    const payload = { keys: {}, models: {} };
+    if (typed) payload.keys[id] = typed;
+    if (model) payload.models[id] = model;
+    if (typed || model) {
+      await fetch('/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    }
+
+    const res = await fetch('/settings/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ provider: id }),
+    }).then((r) => r.json());
+
+    statusEl.textContent = res.message;
+    statusEl.className = 'prov__status ' + (res.ok ? 'prov__status--ok' : 'prov__status--bad');
+  });
+
+  document.getElementById('settings-reload').addEventListener('click', async () => {
+    const settings = await fetch('/settings/reload', { method: 'POST' }).then((r) => r.json());
+    renderProviders(settings);
+    lastProviderInfo = null;
+    refreshStatus();
+  });
+
+  document.getElementById('settings-save').addEventListener('click', async () => {
+    const payload = collectSettings();
+    await fetch('/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    closeSettings();
+    lastProviderInfo = null;
+    refreshStatus();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && settingsModal.classList.contains('is-open')) closeSettings();
+  });
+
+  input.addEventListener('input', () => {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 200) + 'px';
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      form.requestSubmit();
+    }
+  });
+</script>
+</body>
+</html>
