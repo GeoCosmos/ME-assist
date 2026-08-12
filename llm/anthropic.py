@@ -2,53 +2,27 @@ from collections.abc import Iterator
 
 from anthropic import Anthropic
 
-import config
-from llm.base import (
-    Event,
-    LLMError,
-    TextDelta,
-    Usage,
-    build_full_system_instruction,
-    classify_rate_limit,
-)
+from config import ANTHROPIC_API_KEY, ANTHROPIC_MODEL
+from llm.base import LLMError, build_full_system_instruction
 
 _ROLE_MAP = {"user": "user", "model": "assistant"}
 
 
 class AnthropicProvider:
-    name = "anthropic"
-
-    def get_response_stream(
-        self, history: list[dict], domain: str | None = None
-    ) -> Iterator[Event]:
-        model = config.get_model("anthropic")
+    def get_response_stream(self, history: list[dict]) -> Iterator[str]:
         messages = [
             {"role": _ROLE_MAP[turn["role"]], "content": turn["content"]}
             for turn in history
         ]
 
-        input_tokens = 0
-        output_tokens = 0
-
         try:
-            client = Anthropic(api_key=config.get_api_key("anthropic"))
+            client = Anthropic(api_key=ANTHROPIC_API_KEY)
             with client.messages.stream(
-                model=model,
+                model=ANTHROPIC_MODEL,
                 max_tokens=8192,
-                system=build_full_system_instruction(domain, history),
+                system=build_full_system_instruction(),
                 messages=messages,
             ) as stream:
-                for text in stream.text_stream:
-                    yield TextDelta(text)
-                # Must be read inside the context manager, after the stream drains.
-                final = stream.get_final_message()
-                usage = getattr(final, "usage", None)
-                if usage:
-                    input_tokens = getattr(usage, "input_tokens", 0) or 0
-                    output_tokens = getattr(usage, "output_tokens", 0) or 0
-        except LLMError:
-            raise
+                yield from stream.text_stream
         except Exception as exc:
-            raise classify_rate_limit(exc, "Anthropic") from exc
-
-        yield Usage("anthropic", model, input_tokens, output_tokens)
+            raise LLMError(f"Anthropic API call failed: {exc}") from exc

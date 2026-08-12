@@ -4,9 +4,3 @@ __pycache__/
 venv/
 .venv/
 .DS_Store
-usage.db
-usage.db-wal
-usage.db-shm
-usage.db-journal
-*.broken
-node_modules/
