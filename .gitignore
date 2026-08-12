@@ -1,12 +1,28 @@
+# Python
 __pycache__/
-*.pyc
-.env
+*.py[cod]
+*$py.class
+
+# Virtual environment
 venv/
 .venv/
-.DS_Store
+env/
+
+# Local database / runtime data
 usage.db
-usage.db-wal
-usage.db-shm
-usage.db-journal
-*.broken
-node_modules/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# macOS
+.DS_Store
+
+# IDEs
+.vscode/
+.idea/
+
+#Storage
+usage.db
+.fuse_hidden*
