@@ -26,3 +26,9 @@ usage.db
 #Storage
 usage.db
 .fuse_hidden*
+
+# Node (UI test deps)
+node_modules/
+
+# Quarantined databases
+*.broken

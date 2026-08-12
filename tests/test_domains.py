@@ -163,3 +163,38 @@ def test_different_conversations_can_still_differ():
     bolts = build(None, [{"role": "user", "content": "bolt torque preload thread"}])
     thermal = build(None, [{"role": "user", "content": "radiator emissivity heat flux"}])
     assert bolts != thermal
+
+
+def test_prefix_survives_history_trimming(monkeypatch):
+    """Trimming must not change the cacheable prefix.
+
+    Sections are anchored on the untrimmed history for exactly this reason: if
+    the first question is dropped by the window, re-deriving sections from
+    what's left would change the prompt and miss the cache from then on.
+    """
+    import llm
+    from llm.base import TextDelta, Usage as UsageEvent
+
+    monkeypatch.setenv("MAX_HISTORY_TURNS", "4")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+
+    seen = []
+
+    class Fake:
+        def get_response_stream(self, history, domain=None, sections=None):
+            seen.append(sections)
+            yield TextDelta("ok")
+            yield UsageEvent("gemini", "gemini-2.5-flash", 10, 5)
+
+    monkeypatch.setitem(llm._PROVIDERS, "gemini", Fake)
+
+    history = [{"role": "user", "content": "bolt torque preload thread question"}]
+    list(llm.stream_answer(list(history), "c1"))
+
+    for i in range(6):
+        history.append({"role": "model", "content": f"a{i}"})
+        history.append({"role": "user", "content": f"follow up {i} about nothing"})
+    list(llm.stream_answer(list(history), "c1"))
+
+    assert seen[0] is not None
+    assert seen[0] == seen[1], "sections changed after trimming; cache would miss"
