@@ -37,17 +37,36 @@ if [ ! -x "venv/bin/python" ]; then
   }
 fi
 
-# --- Install dependencies once -------------------------------------------
-# Delete venv/.installed to force a reinstall after changing requirements.
-if [ ! -f "venv/.installed" ]; then
-  echo "  Installing dependencies..."
-  ./venv/bin/python -m pip install --upgrade pip --quiet
-  ./venv/bin/python -m pip install -r requirements.txt --quiet || {
+# --- Install dependencies ------------------------------------------------
+# The marker alone is not enough: if requirements.txt gains a package, an
+# existing environment would silently never receive it. Verify the imports
+# actually work and reinstall if they do not.
+NEEDS_INSTALL=0
+[ ! -f "venv/.installed" ] && NEEDS_INSTALL=1
+if [ "$NEEDS_INSTALL" = "0" ]; then
+  ./venv/bin/python -c "import fastapi, uvicorn, dotenv, openai, zoneinfo; zoneinfo.ZoneInfo('America/Los_Angeles')" 2>/dev/null || {
+    echo "  Dependencies are out of date; updating..."
+    NEEDS_INSTALL=1
+  }
+fi
+
+if [ "$NEEDS_INSTALL" = "1" ]; then
+  echo "  First run: downloading dependencies (about 5 MB, usually under a minute)."
+  echo "  This happens once. Later launches start immediately."
+  echo
+  # Deliberately NOT --quiet: with no output this looks frozen, and a slow
+  # network turns that into "it's broken".
+  ./venv/bin/python -m pip install --upgrade pip
+  ./venv/bin/python -m pip install -r requirements.txt || {
     echo "  Dependency installation failed. Check your internet connection."
     read -r -p "  Press Return to close." _
     exit 1
   }
   echo installed > "venv/.installed"
+  echo
+  echo "  Done. Gemini and Claude are optional extras; add them any time with:"
+  echo "    ./venv/bin/python -m pip install -r requirements-gemini.txt"
+  echo "    ./venv/bin/python -m pip install -r requirements-anthropic.txt"
 fi
 
 # --- Make sure there is somewhere to put API keys ------------------------

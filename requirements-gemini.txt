@@ -1,0 +1,3 @@
+# Gemini support. Pulls in google-auth and cryptography, roughly 10 MB.
+# Only needed if you have a Gemini API key.
+google-genai

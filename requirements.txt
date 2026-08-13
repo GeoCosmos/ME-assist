@@ -1,9 +1,18 @@
+# Runtime dependencies. Deliberately small: this is what a first-time user
+# waits for, and every extra package is download time before they can ask a
+# question.
+#
+# The openai package also drives Groq, which uses an OpenAI-compatible
+# endpoint, so these four cover the recommended setup.
 fastapi
 uvicorn
 python-dotenv
-google-genai
-anthropic
 openai
-pydantic
-pytest
-httpx
+
+# Windows has no system timezone database, and zoneinfo reads the OS copy.
+# Without this the app cannot start on Windows at all.
+tzdata; sys_platform == "win32"
+
+# Optional providers -- install only if you have a key for them:
+#   pip install -r requirements-gemini.txt      (adds ~10 MB, 26 packages)
+#   pip install -r requirements-anthropic.txt   (adds ~2 MB)

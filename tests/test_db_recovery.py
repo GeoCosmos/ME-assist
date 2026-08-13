@@ -175,3 +175,37 @@ def test_a_test_database_does_not_create_wal_files(tmp_path, monkeypatch):
     assert db.exists()
     assert not (tmp_path / "usage.db-wal").exists()
     assert not (tmp_path / "usage.db-shm").exists()
+
+
+# --- cross-platform: Windows has no system timezone database -------------
+
+
+def test_missing_timezone_database_does_not_stop_the_app(monkeypatch):
+    """Windows ships no tzdata, and zoneinfo reads the OS copy.
+
+    This crashed the app at import on Windows -- before it could show any
+    error a user could act on.
+    """
+    import zoneinfo
+
+    def broken(key, *args, **kwargs):
+        raise zoneinfo.ZoneInfoNotFoundError(f"No time zone found with key {key}")
+
+    monkeypatch.setattr(zoneinfo, "ZoneInfo", broken)
+    monkeypatch.setattr(usage, "ZoneInfo", broken)
+
+    tz = usage._quota_tz()
+
+    assert tz is not None
+    assert tz.utcoffset(None).total_seconds() == -8 * 3600
+
+
+def test_quota_day_and_reset_work_without_tzdata(monkeypatch):
+    from datetime import timedelta, timezone
+
+    monkeypatch.setattr(usage, "QUOTA_TZ", timezone(timedelta(hours=-8), "PST"))
+
+    assert len(usage.quota_day()) == 10          # YYYY-MM-DD
+    reset = usage.next_reset()
+    assert (reset.hour, reset.minute) == (0, 0)
+    assert reset > usage.now_pacific()
