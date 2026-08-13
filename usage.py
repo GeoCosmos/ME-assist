@@ -12,9 +12,9 @@ import sys
 import tempfile
 import threading
 from dataclasses import dataclass, asdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import config
 
@@ -22,8 +22,31 @@ DB_PATH = Path(
     os.environ.get("ME_ASSIST_DB", Path(__file__).parent / "usage.db")
 )
 
+def _quota_tz():
+    """Pacific time, where the providers' daily quotas roll over.
+
+    Windows ships no system timezone database -- zoneinfo reads the OS copy,
+    which only exists on macOS and Linux. The `tzdata` package supplies it and
+    is installed on Windows, but if it is somehow missing the app must still
+    start: fall back to a fixed -08:00.
+
+    That fallback is correct outside US daylight saving and an hour off during
+    it, which shifts the daily reset by an hour. Losing an hour of accuracy on
+    a quota counter is vastly better than refusing to launch.
+    """
+    try:
+        return ZoneInfo("America/Los_Angeles")
+    except (ZoneInfoNotFoundError, KeyError):
+        print(
+            "  [no timezone database found; using a fixed -08:00 for quota "
+            "resets. Install it with: pip install tzdata]",
+            file=sys.stderr,
+        )
+        return timezone(timedelta(hours=-8), "PST")
+
+
 # Gemini's free-tier request-per-day counter rolls over at midnight Pacific.
-QUOTA_TZ = ZoneInfo("America/Los_Angeles")
+QUOTA_TZ = _quota_tz()
 
 # USD per 1,000,000 tokens: (input, output). Verified August 2026.
 PRICES: dict[str, tuple[float, float]] = {

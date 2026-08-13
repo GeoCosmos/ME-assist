@@ -20,8 +20,10 @@ def _stream_cm(texts, input_tokens=2000, output_tokens=600):
     return cm
 
 
-@patch("llm.anthropic.Anthropic")
-def test_yields_deltas_then_usage_and_passes_system_instruction(mock_anthropic_cls):
+@patch("llm.anthropic._sdk")
+def test_yields_deltas_then_usage_and_passes_system_instruction(mock_sdk):
+    mock_anthropic_cls = MagicMock()
+    mock_sdk.return_value = mock_anthropic_cls
     mock_anthropic_cls.return_value.messages.stream.return_value = _stream_cm(
         ["Use ", "Al 6061-T6."]
     )
@@ -45,8 +47,10 @@ def test_yields_deltas_then_usage_and_passes_system_instruction(mock_anthropic_c
     ]
 
 
-@patch("llm.anthropic.Anthropic")
-def test_raises_llmerror_on_api_failure(mock_anthropic_cls):
+@patch("llm.anthropic._sdk")
+def test_raises_llmerror_on_api_failure(mock_sdk):
+    mock_anthropic_cls = MagicMock()
+    mock_sdk.return_value = mock_anthropic_cls
     mock_anthropic_cls.return_value.messages.stream.side_effect = Exception(
         "network error"
     )

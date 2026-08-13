@@ -28,6 +28,21 @@ The launcher creates the Python environment, installs dependencies, opens the
 launches skip straight to running. The console window it opens *is* the server —
 close it to stop.
 
+**The first run downloads about 5 MB and takes under a minute on a normal
+connection.** It only happens once, and pip prints its progress so you can see
+it working. If it seems slow, it is the download, not the app.
+
+Gemini and Claude are optional and not installed by default — Gemini alone
+pulls in ~10 MB of Google auth libraries. Add either at any time:
+
+```bash
+venv/bin/python -m pip install -r requirements-gemini.txt      # macOS/Linux
+venv\Scripts\python.exe -m pip install -r requirements-anthropic.txt   # Windows
+```
+
+If you select a provider whose package is missing, the app tells you which
+command to run rather than crashing.
+
 You need Python 3 installed. If the launcher can't find it, get it from
 [python.org](https://www.python.org/downloads/) and make sure "Add python.exe to
 PATH" is checked on Windows.
@@ -220,7 +235,7 @@ chain.
 ```bash
 python3 -m venv venv
 source venv/bin/activate          # Windows: venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r requirements.txt   # ~5 MB; add -gemini/-anthropic if needed
 python launch.py                  # or: uvicorn main:app --port 8000
 ```
 
@@ -242,7 +257,17 @@ had the page open from before.
 **A model name is rejected** — check the dropdown in settings for valid ids.
 Note it is `gemini-3.6-flash`, not `gemini-3-flash`.
 
+**`ZoneInfoNotFoundError: No time zone found with key America/Los_Angeles`**
+(Windows only) — Windows has no system timezone database, and Python reads the
+OS copy. The `tzdata` package supplies it and is now installed automatically on
+Windows. If you hit this on an environment created before that change, the
+launcher detects it and reinstalls; or fix it directly with
+`venv\Scripts\python.exe -m pip install tzdata`.
+
 ## Tests
+
+Install the dev dependencies first (`pip install -r requirements-dev.txt`),
+which adds pytest and all the provider SDKs.
 
 ```bash
 pytest tests/ -q                     # 169 backend tests

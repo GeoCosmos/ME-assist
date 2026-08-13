@@ -1,8 +1,5 @@
 from collections.abc import Iterator
 
-from google import genai
-from google.genai import types
-
 import config
 from llm.base import (
     Event,
@@ -12,6 +9,24 @@ from llm.base import (
     build_full_system_instruction,
     classify_rate_limit,
 )
+
+
+def _sdk():
+    """Import the SDK on first use.
+
+    Provider packages are optional so a first-time install stays small. A
+    missing one must fail with an instruction, not an ImportError traceback,
+    and must not stop the other providers from working.
+    """
+    try:
+        from google import genai
+        from google.genai import types
+    except ImportError as exc:  # pragma: no cover - depends on install
+        raise LLMError(
+            "Gemini support is not installed. Run:\n"
+            "    pip install -r requirements-gemini.txt"
+        ) from exc
+    return genai, types
 
 
 class GeminiProvider:
@@ -35,6 +50,7 @@ class GeminiProvider:
         cached_tokens = 0
 
         try:
+            genai, types = _sdk()
             client = genai.Client(api_key=config.get_api_key("gemini"))
             chat = client.chats.create(
                 model=model,

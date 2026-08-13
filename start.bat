@@ -39,12 +39,27 @@ if not exist "venv\Scripts\python.exe" (
   )
 )
 
-REM --- Install dependencies once, then skip on later launches -------------
-REM Delete venv\.installed to force a reinstall after changing requirements.
-if not exist "venv\.installed" (
-  echo   Installing dependencies...
-  "venv\Scripts\python.exe" -m pip install --upgrade pip --quiet
-  "venv\Scripts\python.exe" -m pip install -r requirements.txt --quiet
+REM --- Install dependencies ------------------------------------------------
+REM The marker alone is not enough: if requirements.txt gains a package, an
+REM existing environment would silently never receive it. Verify the imports
+REM actually work and reinstall if they do not.
+set "NEEDS_INSTALL="
+if not exist "venv\.installed" set "NEEDS_INSTALL=1"
+if not defined NEEDS_INSTALL (
+  "venv\Scripts\python.exe" -c "import fastapi, uvicorn, dotenv, openai, zoneinfo; zoneinfo.ZoneInfo('America/Los_Angeles')" >nul 2>&1
+  if errorlevel 1 (
+    echo   Dependencies are out of date; updating...
+    set "NEEDS_INSTALL=1"
+  )
+)
+
+if defined NEEDS_INSTALL (
+  echo   First run: downloading dependencies ^(about 5 MB, usually under a minute^).
+  echo   This happens once. Later launches start immediately.
+  echo.
+  REM Deliberately NOT --quiet: silence for minutes looks like a hang.
+  "venv\Scripts\python.exe" -m pip install --upgrade pip
+  "venv\Scripts\python.exe" -m pip install -r requirements.txt
   if errorlevel 1 (
     echo.
     echo   Dependency installation failed. Check your internet connection.
@@ -52,6 +67,10 @@ if not exist "venv\.installed" (
     exit /b 1
   )
   echo installed > "venv\.installed"
+  echo.
+  echo   Done. Gemini and Claude are optional extras; add them any time with:
+  echo     venv\Scripts\python.exe -m pip install -r requirements-gemini.txt
+  echo     venv\Scripts\python.exe -m pip install -r requirements-anthropic.txt
 )
 
 REM --- Make sure there is somewhere to put API keys -----------------------

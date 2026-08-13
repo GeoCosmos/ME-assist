@@ -1,7 +1,5 @@
 from collections.abc import Iterator
 
-from anthropic import Anthropic
-
 import config
 from llm.base import (
     Event,
@@ -13,6 +11,18 @@ from llm.base import (
 )
 
 _ROLE_MAP = {"user": "user", "model": "assistant"}
+
+
+def _sdk():
+    """Import the SDK on first use; see llm/gemini.py for why."""
+    try:
+        from anthropic import Anthropic
+    except ImportError as exc:  # pragma: no cover - depends on install
+        raise LLMError(
+            "Claude support is not installed. Run:\n"
+            "    pip install -r requirements-anthropic.txt"
+        ) from exc
+    return Anthropic
 
 
 class AnthropicProvider:
@@ -35,6 +45,7 @@ class AnthropicProvider:
         cached_tokens = 0
 
         try:
+            Anthropic = _sdk()
             client = Anthropic(api_key=config.get_api_key("anthropic"))
             with client.messages.stream(
                 model=model,

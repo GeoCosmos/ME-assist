@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -18,8 +19,13 @@ def _chunk(text, prompt_tokens=None, output_tokens=None):
     return chunk
 
 
-@patch("llm.gemini.genai.Client")
-def test_yields_deltas_then_usage_and_passes_history(mock_client_cls):
+@patch("llm.gemini._sdk")
+def test_yields_deltas_then_usage_and_passes_history(mock_sdk):
+    mock_client_cls = MagicMock()
+    mock_sdk.return_value = (
+        MagicMock(Client=mock_client_cls),
+        SimpleNamespace(GenerateContentConfig=lambda **kw: SimpleNamespace(**kw)),
+    )
     def fake_stream(message):
         yield _chunk("Use ")
         yield _chunk("Al 6061-T6.", prompt_tokens=1500, output_tokens=420)
@@ -53,19 +59,51 @@ def test_yields_deltas_then_usage_and_passes_history(mock_client_cls):
     )
 
 
-@patch("llm.gemini.genai.Client")
-def test_raises_llmerror_on_api_failure(mock_client_cls):
+@patch("llm.gemini._sdk")
+def test_raises_llmerror_on_api_failure(mock_sdk):
+    mock_client_cls = MagicMock()
+    mock_sdk.return_value = (
+        MagicMock(Client=mock_client_cls),
+        SimpleNamespace(GenerateContentConfig=lambda **kw: SimpleNamespace(**kw)),
+    )
     mock_client_cls.return_value.chats.create.side_effect = Exception("network error")
 
     with pytest.raises(LLMError):
         list(GeminiProvider().get_response_stream([{"role": "user", "content": "hi"}]))
 
 
-@patch("llm.gemini.genai.Client")
-def test_daily_quota_429_becomes_quota_exceeded(mock_client_cls):
+@patch("llm.gemini._sdk")
+def test_daily_quota_429_becomes_quota_exceeded(mock_sdk):
+    mock_client_cls = MagicMock()
+    mock_sdk.return_value = (
+        MagicMock(Client=mock_client_cls),
+        SimpleNamespace(GenerateContentConfig=lambda **kw: SimpleNamespace(**kw)),
+    )
     mock_client_cls.return_value.chats.create.side_effect = Exception(
         "429 RESOURCE_EXHAUSTED: quota_metric generate_content_requests_per_day"
     )
 
     with pytest.raises(QuotaExceeded):
         list(GeminiProvider().get_response_stream([{"role": "user", "content": "hi"}]))
+
+
+def test_missing_sdk_explains_how_to_install_it(monkeypatch):
+    """Provider packages are optional to keep the first install small, so a
+    missing one must say what to run rather than raise ImportError."""
+    import builtins
+    import llm.gemini as mod
+
+    real_import = builtins.__import__
+
+    def deny(name, *args, **kwargs):
+        if name.startswith("google"):
+            raise ImportError("No module named 'google'")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", deny)
+
+    with pytest.raises(LLMError) as exc:
+        list(mod.GeminiProvider().get_response_stream(
+            [{"role": "user", "content": "hi"}]
+        ))
+    assert "requirements-gemini.txt" in str(exc.value)
