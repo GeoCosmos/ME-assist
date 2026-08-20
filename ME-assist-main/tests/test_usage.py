@@ -25,7 +25,7 @@ def test_record_accumulates_conversation_totals():
 
 
 def test_free_requests_are_counted_but_not_billed():
-    usage.record("gemini", "gemini-2.5-flash", 5000, 800, "c2", billable=False)
+    usage.record("gemini", "gemini-3.6-flash", 5000, 800, "c2", billable=False)
 
     assert usage.requests_today("gemini") == 1
     assert usage.conversation_totals("c2")["cost_usd"] == 0
@@ -36,14 +36,14 @@ def test_free_remaining_counts_down(monkeypatch):
     monkeypatch.setenv("GEMINI_FREE_RPD", "3")
     assert usage.free_remaining("gemini") == 3
 
-    usage.record("gemini", "gemini-2.5-flash", 10, 10, billable=False)
+    usage.record("gemini", "gemini-3.6-flash", 10, 10, billable=False)
     assert usage.free_remaining("gemini") == 2
     assert usage.free_tier_available("gemini") is True
 
 
 def test_free_tier_unavailable_once_exhausted(monkeypatch):
     monkeypatch.setenv("GEMINI_FREE_RPD", "1")
-    usage.record("gemini", "gemini-2.5-flash", 10, 10, billable=False)
+    usage.record("gemini", "gemini-3.6-flash", 10, 10, billable=False)
 
     assert usage.free_remaining("gemini") == 0
     assert usage.free_tier_available("gemini") is False
@@ -128,7 +128,7 @@ def test_token_budget_exhaustion_closes_the_free_tier(monkeypatch):
 
 def test_no_daily_token_cap_means_unlimited(monkeypatch):
     monkeypatch.setenv("GEMINI_FREE_TPD", "0")
-    usage.record("gemini", "gemini-2.5-flash", 500000, 1000, billable=False)
+    usage.record("gemini", "gemini-3.6-flash", 500000, 1000, billable=False)
     assert usage.tokens_remaining("gemini") is None
     assert usage.free_tier_available("gemini") is True
 

@@ -26,7 +26,7 @@ DISPLAY_NAMES = {
 }
 
 DEFAULT_MODELS = {
-    "gemini": "gemini-2.5-flash",
+    "gemini": "gemini-3.6-flash",
     "groq": "llama-3.3-70b-versatile",
     "anthropic": "claude-sonnet-5",
     "openai": "gpt-5",
@@ -37,8 +37,8 @@ DEFAULT_MODELS = {
 # with a generic API error. Verified August 2026.
 KNOWN_MODELS = {
     "gemini": [
-        "gemini-2.5-flash",
-        "gemini-2.5-flash-lite",
+        "gemini-3.6-flash",
+        "gemini-3.6-flash-lite",
         "gemini-3.6-flash",
     ],
     "groq": [
@@ -91,7 +91,7 @@ GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 # safety net, this table just avoids wasting a request to discover a limit.
 #
 # Values below are the ones observed in practice (August 2026):
-#   gemini-2.5-flash        20 requests/day
+#   gemini-3.6-flash        20 requests/day
 #   llama-3.3-70b-versatile 1,000 requests/day
 FREE_TIERS = {
     "gemini": {"rpd": 20, "rpm": 10, "tpm": 250_000, "tpd": 0},

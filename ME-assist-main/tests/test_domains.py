@@ -191,7 +191,7 @@ def test_prefix_survives_history_trimming(monkeypatch):
         def get_response_stream(self, history, domain=None, sections=None):
             seen.append(sections)
             yield TextDelta("ok")
-            yield UsageEvent("gemini", "gemini-2.5-flash", 10, 5)
+            yield UsageEvent("gemini", "gemini-3.6-flash", 10, 5)
 
     monkeypatch.setitem(llm._PROVIDERS, "gemini", Fake)
 

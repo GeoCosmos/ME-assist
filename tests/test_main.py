@@ -35,10 +35,10 @@ def _post(history=None, **kwargs):
 def test_chat_streams_deltas_then_done(mock_stream):
     mock_stream.return_value = iter(
         [
-            ProviderSelected("gemini", "gemini-2.5-flash", True),
+            ProviderSelected("gemini", "gemini-3.6-flash", True),
             TextDelta("Use "),
             TextDelta("Al 6061-T6."),
-            Usage("gemini", "gemini-2.5-flash", 1200, 400),
+            Usage("gemini", "gemini-3.6-flash", 1200, 400),
         ]
     )
 
@@ -219,13 +219,13 @@ def test_changing_the_model_takes_effect_immediately(tmp_path, monkeypatch):
 def test_reload_picks_up_a_hand_edited_env(tmp_path, monkeypatch):
     """Editing .env while the server runs must not silently do nothing."""
     env_file = tmp_path / ".env"
-    env_file.write_text("GEMINI_MODEL=gemini-2.5-flash-lite\n")
+    env_file.write_text("GEMINI_MODEL=gemini-3.6-flash-lite\n")
     monkeypatch.setattr(config, "ENV_PATH", env_file)
 
     response = client.post("/settings/reload")
 
     assert response.status_code == 200
-    assert config.get_model("gemini") == "gemini-2.5-flash-lite"
+    assert config.get_model("gemini") == "gemini-3.6-flash-lite"
 
 
 def test_free_limits_are_editable_from_settings(tmp_path, monkeypatch):

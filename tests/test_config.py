@@ -3,7 +3,7 @@ import config
 
 def test_default_model_when_env_not_set(monkeypatch):
     monkeypatch.delenv("GEMINI_MODEL", raising=False)
-    assert config.get_model("gemini") == "gemini-2.5-flash"
+    assert config.get_model("gemini") == "gemini-3.6-flash"
 
 
 def test_model_reads_from_env(monkeypatch):

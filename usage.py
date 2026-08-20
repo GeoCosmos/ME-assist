@@ -50,8 +50,8 @@ QUOTA_TZ = _quota_tz()
 
 # USD per 1,000,000 tokens: (input, output). Verified August 2026.
 PRICES: dict[str, tuple[float, float]] = {
-    "gemini-2.5-flash": (0.30, 2.50),
-    "gemini-2.5-flash-lite": (0.10, 0.40),
+    "gemini-3.6-flash": (0.30, 2.50),
+    "gemini-3.6-flash-lite": (0.10, 0.40),
     "gemini-2.5-pro": (1.25, 10.00),
     "claude-sonnet-5": (2.00, 10.00),
     "claude-opus-5": (15.00, 75.00),

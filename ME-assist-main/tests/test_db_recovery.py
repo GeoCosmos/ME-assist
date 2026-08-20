@@ -123,7 +123,7 @@ def test_a_chat_turn_completes_with_a_dead_ledger(monkeypatch):
     class Fake:
         def get_response_stream(self, history, domain=None, sections=None):
             yield TextDelta("the answer")
-            yield UsageEvent("gemini", "gemini-2.5-flash", 100, 50)
+            yield UsageEvent("gemini", "gemini-3.6-flash", 100, 50)
 
     monkeypatch.setitem(llm._PROVIDERS, "gemini", Fake)
 
