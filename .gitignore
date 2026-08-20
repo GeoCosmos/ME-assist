@@ -40,3 +40,8 @@ node_modules/
 # Useful on this machine, not part of the project.
 finish.sh
 RESTORE.md
+
+.env
+chroma_db/
+__pycache__/
+*.pyc
