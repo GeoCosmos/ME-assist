@@ -1,0 +1,6 @@
+# Development only -- not needed to run the app.
+-r requirements.txt
+-r requirements-gemini.txt
+-r requirements-anthropic.txt
+pytest
+httpx

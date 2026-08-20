@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# Local database / runtime data
+usage.db
+usage.db-wal
+usage.db-shm
+usage.db-journal
+
+# Quarantined databases (created when a corrupt usage.db is set aside)
+*.broken
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# macOS
+.DS_Store
+
+# FUSE artefacts: a file deleted while still open gets renamed to this
+# instead of being unlinked. They are orphaned data, never source.
+.fuse_hidden*
+
+# Node (UI test dependencies)
+node_modules/
+
+# IDEs
+.vscode/
+.idea/
+
+# Local scaffolding — helper scripts and notes for one-off situations.
+# Useful on this machine, not part of the project.
+finish.sh
+RESTORE.md
