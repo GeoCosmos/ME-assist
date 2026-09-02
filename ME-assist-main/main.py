@@ -8,20 +8,6 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import FakeEmbeddings
-
-# Initialize lightweight vector search
-embeddings = FakeEmbeddings(size=384)
-vector_db = Chroma(persist_directory="./chroma_db", embedding_function=embeddings)
-
-def get_rag_context(query: str) -> str:
-    try:
-        results = vector_db.similarity_search(query, k=3)
-        return "\n---\n".join([doc.page_content for doc in results])
-    except Exception:
-        return ""
-
 import config
 import domains
 import usage as usage_ledger
@@ -101,11 +87,6 @@ def _stream_chat(
     domain: str | None = None,
 ) -> Iterator[str]:
     try:
-        if history and history[-1]["role"] == "user":
-            user_query = history[-1]["content"]
-            rag_context = get_rag_context(user_query)
-            if rag_context:
-                history[-1]["content"] = f"Reference Context:\n{rag_context}\n\nUser Question:\n{user_query}"
         for event in stream_answer(
             history, conversation_id, approved_provider, domain
         ):

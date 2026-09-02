@@ -1,0 +1,3 @@
+TEST MECHANICAL DATA:
+- M6 Socket Head Cap Screw (Class 12.9): Recommended tightening torque is 12.5 Nm using dry assembly.
+- Al 6061-T6: Yield strength ~276 MPa.

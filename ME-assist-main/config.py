@@ -39,6 +39,7 @@ KNOWN_MODELS = {
     "gemini": [
         "gemini-3.6-flash",
         "gemini-3.6-flash-lite",
+        "gemini-3.6-flash",
     ],
     "groq": [
         "llama-3.3-70b-versatile",
