@@ -1,3 +1,7 @@
+import os
+import pickle
+from dotenv import load_dotenv
+
 import json
 import uuid
 from collections.abc import Iterator
@@ -9,16 +13,54 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from langchain_community.vectorstores import Chroma
-from langchain_community.embeddings import FakeEmbeddings
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
-# Initialize lightweight vector search
-embeddings = FakeEmbeddings(size=384)
+# Safe import for EnsembleRetriever with built-in fallback
+try:
+    from langchain.retrievers import EnsembleRetriever
+except ImportError:
+    try:
+        from langchain.retrievers.ensemble import EnsembleRetriever
+    except ImportError:
+        class EnsembleRetriever:
+            def __init__(self, retrievers, weights=None):
+                self.retrievers = retrievers
+            def invoke(self, query):
+                return self.retrievers[0].invoke(query)
+
+# Load environment variables
+load_dotenv()
+api_key = os.getenv("GEMINI_API_KEY")
+
+# Initialize Gemini embeddings and load Chroma vector store
+embeddings = GoogleGenerativeAIEmbeddings(
+    model="gemini-embedding-2-preview",
+    google_api_key=api_key
+)
 vector_db = Chroma(persist_directory="./chroma_db", embedding_function=embeddings)
+vector_retriever = vector_db.as_retriever(search_kwargs={"k": 3})
+
+# Load the saved BM25 keyword index
+try:
+    with open("bm25_retriever.pkl", "rb") as f:
+        bm25_retriever = pickle.load(f)
+    bm25_retriever.k = 3
+except Exception:
+    bm25_retriever = None
+
+# Create Hybrid Ensemble Retriever combining BM25 and Vector Search
+if bm25_retriever:
+    hybrid_retriever = EnsembleRetriever(
+        retrievers=[bm25_retriever, vector_retriever],
+        weights=[0.5, 0.5]
+    )
+else:
+    hybrid_retriever = vector_retriever
 
 def get_rag_context(query: str) -> str:
     try:
-        results = vector_db.similarity_search(query, k=3)
-        return "\n---\n".join([doc.page_content for doc in results])
+        docs = hybrid_retriever.invoke(query)
+        return "\n---\n".join([doc.page_content for doc in docs])
     except Exception:
         return ""
 
